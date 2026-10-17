@@ -1,5 +1,11 @@
-# Object file
-*.o
-
-# Ada Library Information
-*.ali
+node_modules/
+dist/
+build/
+.env
+.env.*
+!.env.example
+*.log
+test-results/
+playwright-report/
+.DS_Store
+.tools/

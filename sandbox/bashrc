@@ -1,0 +1,7 @@
+# Keep Bash's normal parsing, readline, job control and error messages.
+export PS1='\[\e[38;5;155m\]\u@shelllab\[\e[0m\]:\[\e[38;5;110m\]\w\[\e[0m\]\$ '
+export HISTFILE="$HOME/.bash_history"
+export HISTSIZE=2000
+export HISTFILESIZE=2000
+shopt -s checkwinsize
+bind 'set completion-ignore-case off'
