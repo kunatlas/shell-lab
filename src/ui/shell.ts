@@ -18,7 +18,7 @@ export function shellMarkup(topicCount: number, shortcut: string): string {
       <button class="rail-item active" id="practice-nav" aria-label="练习" aria-current="page">${icon('file')}<span>练习</span></button>
       <button class="rail-item" id="menu" aria-label="打开练习列表" aria-expanded="false" aria-controls="sidebar">${icon('book')}<span>场景库</span></button>
       <button class="rail-item" id="history-nav" aria-label="练习历史">${icon('clock')}<span>历史</span></button>
-      <div class="rail-bottom"><button class="rail-item" id="settings-nav" aria-label="设置">${icon('settings')}<span>设置</span></button><span class="avatar" title="本地练习者" aria-label="本地练习者"><svg viewBox="0 0 32 32" fill="currentColor"><circle cx="16" cy="11" r="6"/><path d="M4 30v-3c0-6 5-9 12-9s12 3 12 9v3"/></svg></span></div>
+      <div class="rail-bottom"><button class="rail-item" id="settings-nav" aria-label="设置">${icon('settings')}<span>设置</span></button><span class="avatar" title="DeepSeek 鲸鱼娘 · 本地练习者" aria-label="DeepSeek 鲸鱼娘，本地练习者"><img src="/avatar-whale-girl.png" alt="" draggable="false"></span></div>
     </nav>
     <aside class="sidebar" id="sidebar" aria-label="场景库" inert>
       <div class="sidebar-top">

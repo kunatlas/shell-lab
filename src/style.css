@@ -53,8 +53,8 @@ html[data-desktop="darwin"] .titlebar { padding-left: 84px; }
 .rail-item.active { color: var(--accent); }
 .rail-item.active::before { position: absolute; top: 12px; bottom: 12px; left: 0; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); content: ''; }
 .rail-bottom { display: flex; flex-direction: column; align-items: center; width: 100%; gap: 16px; margin-top: auto; padding-bottom: 22px; }
-.avatar { width: 38px; height: 38px; border-radius: 50%; overflow: hidden; background: #dbd7cb; color: #a29e90; }
-.avatar svg { width: 100%; height: 100%; }
+.avatar { width: 38px; height: 38px; border-radius: 50%; overflow: hidden; background: #fff; box-shadow: 0 0 0 1px #c9d6ef, 0 1px 3px #2b4b8f1a; }
+.avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .main { margin-left: var(--rail-w); padding: var(--titlebar-h) 24px 24px 28px; min-width: 0; outline: none; }
 .workspace-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; height: 74px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
 .breadcrumb { display: flex; align-items: center; gap: 17px; min-width: 0; font-size: 18px; letter-spacing: .3px; white-space: nowrap; }

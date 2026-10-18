@@ -32,8 +32,23 @@ if [[ ! -f node_modules/.package-lock.json ]] \
   npm ci --include=dev --no-audit --no-fund
 fi
 
+# Electron 44 的 npm 包不再带 postinstall；显式解压缓存中的本机二进制。
+if [[ ! -x node_modules/electron/dist/electron ]]; then
+  printf '正在准备 Electron 本机二进制……\n'
+  node node_modules/electron/install.js
+fi
+
+# npm 11 的 install-scripts 白名单可能跳过 node-pty 的构建脚本。
+if [[ ! -f node_modules/node-pty/build/Release/pty.node ]]; then
+  printf '正在准备 node-pty 本机二进制……\n'
+  if ! npm rebuild node-pty >/dev/null 2>&1; then
+    printf 'node-pty 构建脚本被 npm 拦截。请运行 `npm install-scripts approve node-pty` 后重试，或检查 python3/make/g++ 是否可用。\n' >&2
+    exit 1
+  fi
+fi
+
 if [[ ! -x node_modules/electron/dist/electron ]] || [[ ! -f node_modules/node-pty/build/Release/pty.node ]]; then
-  printf 'Electron 或 node-pty 的本机二进制未就绪。请检查网络后重新执行 npm ci。\n' >&2
+  printf 'Electron 或 node-pty 的本机二进制仍未就绪。Electron 可尝试重新运行 node node_modules/electron/install.js；node-pty 请检查构建工具。\n' >&2
   exit 1
 fi
 
