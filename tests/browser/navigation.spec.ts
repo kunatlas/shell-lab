@@ -77,6 +77,53 @@ test('mobile drawer opens, filters, and closes with Escape without horizontal ov
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
+test('narrow screens keep body copy readable', async ({ page }) => {
+  await page.setViewportSize({ width: 546, height: 993 });
+  await page.goto('/');
+
+  const sizes = await page.evaluate(() => {
+    const size = (selector: string) => parseFloat(getComputedStyle(document.querySelector(selector)!).fontSize);
+    return {
+      title: size('#lesson-content h2'),
+      subtitle: size('.lesson-subtitle'),
+      description: size('.lesson-description'),
+      rail: size('.rail-item'),
+      hint: size('.hint-button'),
+      primary: size('.primary-button'),
+    };
+  });
+  expect(sizes.title).toBeGreaterThanOrEqual(28);
+  expect(sizes.subtitle).toBeGreaterThanOrEqual(16);
+  expect(sizes.description).toBeGreaterThanOrEqual(15);
+  expect(sizes.rail).toBeGreaterThanOrEqual(13);
+  expect(sizes.hint).toBeGreaterThanOrEqual(15);
+  expect(sizes.primary).toBeGreaterThanOrEqual(15);
+  await page.screenshot({ path: 'test-results/narrow-readable.png', fullPage: true });
+});
+
+test('large screens widen the lesson panel and scale typography', async ({ page }) => {
+  await page.setViewportSize({ width: 2560, height: 1528 });
+  await page.goto('/');
+
+  const panel = page.locator('.lesson-panel');
+  const box = await panel.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.width).toBeGreaterThan(480);
+
+  const titleSize = await page.locator('#lesson-content h2').evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+  expect(titleSize).toBeGreaterThanOrEqual(38);
+  const railSize = await page.locator('.rail-item').first().evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+  expect(railSize).toBeGreaterThanOrEqual(18);
+  const stepSize = await page.locator('.start-steps p').first().evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+  expect(stepSize).toBeGreaterThanOrEqual(15);
+  const footerSize = await page.locator('.terminal-footer').evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+  expect(footerSize).toBeGreaterThanOrEqual(14);
+  await page.screenshot({ path: 'test-results/large-screen.png', fullPage: true });
+
+  await page.locator('#settings-nav').click();
+  await expect(page.locator('#terminal-font-size')).toHaveValue('auto');
+});
+
 test('command palette opens with Control+K and preselects a scenario', async ({ page }) => {
   await page.goto('/');
   await page.keyboard.press('Control+K');

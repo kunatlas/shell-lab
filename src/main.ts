@@ -2,6 +2,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import './style.css';
+import './ui/desktop.css';
 import { icon } from './ui/icons.js';
 import { shellMarkup } from './ui/shell.js';
 import { bindDesktopControls, writeClipboard } from './ui/desktop.js';
@@ -33,6 +34,10 @@ let connected = false;
 let connectionGeneration = 0;
 let result: CheckResult | undefined;
 let hintVisible = false;
+let customFontSize = false;
+const UI_SCALE_KEY = 'shell-lab-ui-scale';
+const DEFAULT_UI_SCALE = 1.25;
+let uiScale = DEFAULT_UI_SCALE;
 let completed = new Set<string>();
 try { completed = new Set(JSON.parse(localStorage.getItem('shell-lab-progress-v1') ?? '[]')); } catch { /* Private browsing may block storage. */ }
 
@@ -46,7 +51,7 @@ let drawerOpen = false;
 const mobileQuery = window.matchMedia('(max-width: 680px)');
 
 const terminal = new Terminal({
-  cursorBlink: true, cursorStyle: 'block', fontSize: 14, lineHeight: 1.6,
+  cursorBlink: true, cursorStyle: 'block', fontSize: 16, lineHeight: 1.6,
   fontFamily: '"SFMono-Regular", "Cascadia Code", "JetBrains Mono", "IBM Plex Mono", "Liberation Mono", Menlo, Consolas, monospace',
   scrollback: 5000, allowProposedApi: false,
   theme: {
@@ -89,8 +94,37 @@ function topicMatches(topic: ScenarioTopic, query: string): boolean {
   return fields.join(' ').toLowerCase().includes(query);
 }
 
+function updateTerminalDimensions(): void {
+  const dimensions = document.querySelector('#terminal-dimensions');
+  if (dimensions) dimensions.textContent = `${terminal.cols} × ${terminal.rows}`;
+}
+
+let fitFrame: number | undefined;
 function fitTerminal(): void {
-  requestAnimationFrame(() => { try { fitAddon.fit(); } catch { /* Terminal is not attached yet. */ } });
+  if (fitFrame !== undefined) return;
+  fitFrame = requestAnimationFrame(() => {
+    fitFrame = undefined;
+    try {
+      fitAddon.fit();
+      updateTerminalDimensions();
+    } catch { /* Terminal is not attached yet. */ }
+  });
+}
+
+function applyResponsiveTerminalFontSize(): void {
+  if (customFontSize) return;
+  const size = window.innerWidth >= 3000 ? 22 : window.innerWidth >= 2300 ? 20 : window.innerWidth >= 1800 ? 18 : window.shellLabDesktop ? 16 : 14;
+  if (terminal.options.fontSize === size) return;
+  terminal.options.fontSize = size;
+  fitTerminal();
+}
+
+function applyUiScale(scale: number): void {
+  const bridge = window.shellLabDesktop;
+  if (!bridge) return;
+  void bridge.setZoom(scale).then(() => {
+    window.setTimeout(fitTerminal, 50);
+  }).catch(() => { /* Keep the current scale. */ });
 }
 
 async function api<T>(path: string, body?: object): Promise<T> {
@@ -106,10 +140,7 @@ function layout() {
   $('#app').innerHTML = shellMarkup(generator.topics.length, paletteShortcut);
   bindDesktopControls();
   terminal.open($('#terminal'));
-  new ResizeObserver(() => {
-    fitTerminal();
-    $('#terminal-dimensions').textContent = `${terminal.cols} × ${terminal.rows}`;
-  }).observe($('#terminal'));
+  new ResizeObserver(() => fitTerminal()).observe($('#terminal'));
   $('#menu').addEventListener('click', () => setDrawer(!drawerOpen));
   $('#sidebar-scrim').addEventListener('click', () => setDrawer(false));
   $('#reference').addEventListener('click', showReference);
@@ -121,7 +152,11 @@ function layout() {
   $('#sidebar-close').addEventListener('click', () => setDrawer(false));
   $('#guide').addEventListener('click', showGuide);
   document.querySelectorAll('[data-open-generator]').forEach((button) => button.addEventListener('click', showGenerator));
-  $('#hint').addEventListener('click', () => { hintVisible = !hintVisible; renderLesson(); });
+  $('#hint').addEventListener('click', () => {
+    if (!selected) return;
+    hintVisible = !hintVisible;
+    renderHint(hintVisible);
+  });
   $('#check').addEventListener('click', () => void check());
   $('#clear').addEventListener('click', () => { terminal.clear(); terminal.focus(); });
   $('#reset').addEventListener('click', requestReset);
@@ -151,9 +186,23 @@ function layout() {
   mobileQuery.addEventListener('change', syncDrawerMode);
   syncDrawerMode();
   try {
-    const savedSize = Number(localStorage.getItem('shell-lab-font-size'));
-    if (savedSize >= 12 && savedSize <= 20) terminal.options.fontSize = savedSize;
-  } catch { /* Use the default font size when storage is unavailable. */ }
+    const saved = localStorage.getItem('shell-lab-font-size');
+    const savedSize = Number(saved);
+    if (saved !== null && savedSize >= 12 && savedSize <= 22) {
+      customFontSize = true;
+      terminal.options.fontSize = savedSize;
+    }
+  } catch { /* Use the responsive default when storage is unavailable. */ }
+  applyResponsiveTerminalFontSize();
+  window.addEventListener('resize', applyResponsiveTerminalFontSize);
+  try {
+    const savedScale = localStorage.getItem(UI_SCALE_KEY);
+    if (savedScale !== null) {
+      const scale = Number(savedScale);
+      if (scale >= 0.8 && scale <= 2) uiScale = scale;
+    }
+  } catch { /* Use the default scale. */ }
+  applyUiScale(uiScale);
 }
 
 function onScenarioClick(event: Event) {
@@ -200,7 +249,6 @@ function setDrawer(open: boolean, restoreFocus = true) {
     sidebar.setAttribute('inert', '');
     if (restoreFocus) menu.focus();
   }
-  fitTerminal();
 }
 
 function syncDrawerMode() {
@@ -345,17 +393,31 @@ function renderLesson() {
     <p class="objective-progress">已完成 ${result?.results.filter((item) => item.passed).length ?? 0} / ${lesson.objectives.length}</p>
     <div class="exercise-files">${icon('folder')}<span>练习文件</span><code title="${escape(session?.workspace ?? '')}">${escape(relativeWorkspace())}</code></div>
     <div class="takeaway"><p>${escape(lesson.takeaway)}</p></div>
-    ${hintVisible ? `<div class="hint-content"><div class="code-heading"><span class="hint-title">$ hint --show</span><button class="icon-button" id="copy-example" aria-label="复制参考命令">${icon('copy')}</button></div><h3>试试这个思路</h3><p>${escape(lesson.hint)}</p><div class="code-heading code-heading-reference"><span>参考写法</span></div><pre><code>${escape(lesson.example)}</code></pre></div>` : ''}
+    <section class="hint-content" id="lesson-hint" aria-label="练习提示" hidden></section>
     ${result ? `<div class="result-message ${result.passed ? 'success' : ''}" role="status">${result.passed ? `${icon('check')}<div><strong>做得好，练习完成！</strong><p>所有目标都已通过检查。</p></div>` : `<div><strong>已经完成 ${result.results.filter((item) => item.passed).length} / ${result.results.length} 个目标</strong><p>查看上面的反馈，调整后可以再次检查。</p></div>`}</div>` : ''}
     ${result?.passed && lesson.generated ? `<button class="next-button" id="another">再生成一道开发实战 ${icon('spark')}</button>` : ''}`;
   $('#terminal-workspace').textContent = relativeWorkspace();
   $('#terminal-workspace').title = session?.workspace ?? '';
-  $('#hint').classList.toggle('selected', hintVisible);
-  $('#hint span').textContent = hintVisible ? '收起提示' : '给我一点提示';
-  document.querySelector('#copy-example')?.addEventListener('click', () => void copy(lesson.example));
+  renderHint();
   document.querySelector('#change-challenge')?.addEventListener('click', showGenerator);
   document.querySelector('#another')?.addEventListener('click', showGenerator);
   updateButtons();
+}
+
+function renderHint(reveal = false) {
+  const hint = document.querySelector<HTMLElement>('#lesson-hint');
+  if (!hint || !selected) return;
+  if (hintVisible && !hint.firstElementChild) {
+    const lesson = selected;
+    hint.innerHTML = `<div class="code-heading"><span class="hint-title">$ hint --show</span><button class="icon-button" id="copy-example" aria-label="复制参考命令">${icon('copy')}</button></div><h3>试试这个思路</h3><p>${escape(lesson.hint)}</p><div class="code-heading code-heading-reference"><span>参考写法</span></div><pre><code>${escape(lesson.example)}</code></pre>`;
+    $('#copy-example').addEventListener('click', () => void copy(lesson.example));
+  }
+  hint.hidden = !hintVisible;
+  $('#hint').classList.toggle('selected', hintVisible);
+  $('#hint').setAttribute('aria-expanded', String(hintVisible));
+  $('#hint span').textContent = hintVisible ? '收起提示' : '给我一点提示';
+  // Jump to the feedback without queueing scroll animations during repeated clicks.
+  if (reveal && hintVisible) hint.scrollIntoView({ block: 'start', behavior: 'instant' });
 }
 
 function difficultyLabel(difficulty?: Difficulty): string {
@@ -398,12 +460,32 @@ function showHistory() {
 }
 function showSettings() {
   setDrawer(false, false);
-  showDialog(`<div class="dialog-eyebrow">MAKE IT YOURS</div><h2 id="dialog-title">练习设置</h2><p>让工作区更适合你的节奏。</p><div class="settings-row"><label for="terminal-font-size">终端字号<small>调整后立即生效，自动保存在当前设备</small></label><select id="terminal-font-size" aria-label="终端字号">${[12, 13, 14, 15, 16, 18, 20].map((size) => `<option value="${size}" ${size === terminal.options.fontSize ? 'selected' : ''}>${size} px</option>`).join('')}</select></div><div class="settings-environment">${icon('shield')}<div><h3>${health.mode === 'local' ? '本机开发环境 · 未隔离' : '独立 Linux 练习环境'}</h3><p>${escape(health.message)}</p></div></div><p class="dialog-footnote">ShellLab · 真实命令，真实进步。</p>`, 'settings');
+  const sizes = [12, 13, 14, 15, 16, 18, 20, 22];
+  const uiScaleRow = window.shellLabDesktop
+    ? `<div class="settings-row"><label for="ui-scale">界面缩放<small>调整整个窗口的显示比例，立即生效并保存在当前设备</small></label><select id="ui-scale" aria-label="界面缩放">${[1, 1.1, 1.15, 1.25, 1.5].map((scale) => `<option value="${scale}" ${Math.abs(scale - uiScale) < 0.001 ? 'selected' : ''}>${Math.round(scale * 100)}%</option>`).join('')}</select></div>`
+    : '';
+  showDialog(`<div class="dialog-eyebrow">MAKE IT YOURS</div><h2 id="dialog-title">练习设置</h2><p>让工作区更适合你的节奏。</p>${uiScaleRow}<div class="settings-row"><label for="terminal-font-size">终端字号<small>调整后立即生效，自动保存在当前设备</small></label><select id="terminal-font-size" aria-label="终端字号"><option value="auto" ${customFontSize ? '' : 'selected'}>自动（跟随窗口）</option>${sizes.map((size) => `<option value="${size}" ${customFontSize && size === terminal.options.fontSize ? 'selected' : ''}>${size} px</option>`).join('')}</select></div><div class="settings-environment">${icon('shield')}<div><h3>${health.mode === 'local' ? '本机开发环境 · 未隔离' : '独立 Linux 练习环境'}</h3><p>${escape(health.message)}</p></div></div><p class="dialog-footnote">ShellLab · 真实命令，真实进步。</p>`, 'settings');
   $('#terminal-font-size').addEventListener('change', (event) => {
-    const size = Number((event.target as HTMLSelectElement).value);
+    const value = (event.target as HTMLSelectElement).value;
+    if (value === 'auto') {
+      customFontSize = false;
+      try { localStorage.removeItem('shell-lab-font-size'); } catch { /* Use the responsive default. */ }
+      applyResponsiveTerminalFontSize();
+      fitTerminal();
+      return;
+    }
+    const size = Number(value);
+    customFontSize = true;
     terminal.options.fontSize = size;
     try { localStorage.setItem('shell-lab-font-size', String(size)); } catch { /* The current setting still applies. */ }
     fitTerminal();
+  });
+  $('#ui-scale')?.addEventListener('change', (event) => {
+    const scale = Number((event.target as HTMLSelectElement).value);
+    if (!Number.isFinite(scale) || scale < 0.8 || scale > 2) return;
+    uiScale = scale;
+    try { localStorage.setItem(UI_SCALE_KEY, String(scale)); } catch { /* The current scale still applies. */ }
+    applyUiScale(scale);
   });
 }
 
@@ -476,6 +558,7 @@ function connectTerminal() {
     $('#terminal-overlay').hidden = true;
     connectionState('ready', health.mode === 'local' ? '本机 Bash · 未隔离' : 'Linux 环境已连接');
     fitAddon.fit();
+    updateTerminalDimensions();
     current.send(JSON.stringify({ type: 'resize', cols: terminal.cols, rows: terminal.rows }));
     updateButtons(); terminal.focus();
   });

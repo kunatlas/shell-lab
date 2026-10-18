@@ -38,7 +38,7 @@ export function shellMarkup(topicCount: number, shortcut: string): string {
         <section class="lesson-panel" aria-label="练习说明">
           <div class="visually-hidden"><span id="lesson-state">IDLE</span><span id="lesson-meta">—</span></div>
           <div id="lesson-content"></div>
-          <div class="lesson-actions"><button class="hint-button" id="hint">${icon('bulb')}<span>给我一点提示</span></button><div class="action-row"><button class="primary-button" id="check">检查结果</button><button class="secondary-button" id="skip" aria-label="跳过当前练习">跳过</button></div><p class="action-caption">可随时重置练习环境</p></div>
+          <div class="lesson-actions"><button class="hint-button" id="hint" aria-expanded="false" aria-controls="lesson-hint">${icon('bulb')}<span>给我一点提示</span></button><div class="action-row"><button class="primary-button" id="check">检查结果</button><button class="secondary-button" id="skip" aria-label="跳过当前练习">跳过</button></div><p class="action-caption">可随时重置练习环境</p></div>
         </section>
         <section class="terminal-panel" aria-label="Linux 交互式终端">
           <header class="terminal-header"><div class="terminal-tab"><span class="terminal-tab-icon">${icon('terminal')}</span><strong>bash</strong><span id="terminal-workspace">~/workspace</span></div><div class="terminal-tools"><button class="icon-button" id="clear" title="清空终端显示" aria-label="清空终端显示">${icon('spark')}</button><button class="reset-button" id="reset" aria-label="重置环境">重置</button><button class="icon-button" id="fullscreen" aria-label="展开终端" aria-pressed="false" title="展开终端">${icon('expand')}</button></div></header>

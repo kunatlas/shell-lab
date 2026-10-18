@@ -3,6 +3,8 @@ const path = require('node:path');
 
 let mainWindow;
 const address = process.env.SHELL_LAB_DESKTOP_URL;
+// Keep desktop tests and alternate profiles from sharing the single-instance lock.
+if (process.env.SHELL_LAB_USER_DATA) app.setPath('userData', process.env.SHELL_LAB_USER_DATA);
 function localAddress(value) {
   try {
     const url = new URL(value);
@@ -56,6 +58,11 @@ if (!app.requestSingleInstanceLock()) {
       if (!trusted(event)) throw new Error('剪贴板写入被拒绝。');
       if (typeof text !== 'string' || text.length > 100_000) throw new Error('无效的剪贴板内容。');
       clipboard.writeText(text);
+    });
+    ipcMain.handle('shell-lab:set-zoom', (event, factor) => {
+      if (!trusted(event)) throw new Error('界面缩放被拒绝。');
+      if (typeof factor !== 'number' || !Number.isFinite(factor) || factor < 0.8 || factor > 2) throw new Error('无效的界面缩放比例。');
+      mainWindow.webContents.setZoomFactor(factor);
     });
     await mainWindow.loadURL(address);
   }).catch((error) => {

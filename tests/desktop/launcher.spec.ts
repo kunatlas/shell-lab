@@ -1,6 +1,9 @@
 import { test, expect, chromium, type Browser } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const port = 3017;
 const debugPort = 9337;
@@ -10,9 +13,10 @@ const debugUrl = `http://127.0.0.1:${debugPort}`;
 
 test('launcher starts the backend and cleans everything up when the window closes', async () => {
   test.setTimeout(90_000);
+  const userDataDir = await mkdtemp(join(tmpdir(), 'shelllab-launcher-'));
   const launcher: ChildProcess = spawn(process.execPath, ['scripts/desktop.mjs', `--remote-debugging-port=${debugPort}`], {
     cwd: process.cwd(),
-    env: { ...process.env, SHELL_LAB_RUNTIME: 'local', SHELL_LAB_DESKTOP_PORT: String(port) },
+    env: { ...process.env, SHELL_LAB_RUNTIME: 'local', SHELL_LAB_DESKTOP_PORT: String(port), SHELL_LAB_USER_DATA: userDataDir },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let exitCode: number | null | undefined;
@@ -42,5 +46,6 @@ test('launcher starts the backend and cleans everything up when the window close
     await browser?.close().catch(() => {});
     if (exitCode === undefined) launcher.kill('SIGTERM');
     await Promise.race([once(launcher, 'exit'), new Promise((resolve) => setTimeout(resolve, 5_000))]);
+    await rm(userDataDir, { recursive: true, force: true });
   }
 });

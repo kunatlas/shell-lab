@@ -71,7 +71,7 @@ html[data-desktop="darwin"] .titlebar { padding-left: 84px; }
 .text-button:hover { color: var(--accent); }
 .palette-trigger { padding: 0; }
 .palette-trigger kbd { padding: 3px 8px; }
-.exercise-layout { display: grid; grid-template-columns: 302px minmax(0, 1fr); gap: 30px; min-height: 0; height: calc(100dvh - var(--titlebar-h) - 110px); }
+.exercise-layout { display: grid; grid-template-columns: clamp(302px, 27%, 600px) minmax(0, 1fr); gap: 30px; min-height: 0; height: calc(100dvh - var(--titlebar-h) - 110px); }
 .lesson-panel { display: flex; flex-direction: column; min-height: 0; padding: 18px 0 0 2px; }
 #lesson-content { overflow-y: auto; min-height: 0; padding: 0 4px 16px 0; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .lesson-meta { display: flex; align-items: center; gap: 14px; margin-bottom: 13px; font-size: 13px; color: var(--text-secondary); }
@@ -203,7 +203,25 @@ pre { border: 1px solid var(--line); border-radius: 7px; padding: 12px; backgrou
 .active-challenge { margin-bottom: 14px; padding: 10px; border-left: 2px solid var(--accent-line); background: var(--accent-soft); }
 .active-challenge span, .active-challenge small { display: block; color: var(--muted); font-size: 9px; }
 .active-challenge strong { display: block; margin: 4px 0; font-size: 11px; color: var(--accent); font-weight: 500; }
-.sidebar-scrim { position: fixed; inset: var(--titlebar-h) 0 0 var(--rail-w); z-index: 33; background: #35352e20; backdrop-filter: blur(2px); }
+.sidebar-scrim { position: fixed; inset: var(--titlebar-h) 0 0 var(--rail-w); z-index: 33; background: #35352e20; }
+
+.sidebar-scroll, .generator-scroll, #palette-list { overscroll-behavior-y: contain; }
+#lesson-content pre { white-space: pre-wrap; overflow-wrap: anywhere; overflow: visible; }
+@media (min-width: 681px) {
+  /* Text, hints and the sticky actions share one native wheel-scroll surface. */
+  .lesson-panel {
+    overflow-y: auto;
+    overflow-x: hidden;
+    contain: layout paint;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+    overscroll-behavior-y: contain;
+    scroll-padding-block: 20px 140px;
+  }
+  #lesson-content { flex: none; overflow: visible; }
+  .lesson-actions { position: sticky; bottom: 0; z-index: 1; flex: none; }
+}
 dialog {
   width: calc(100% - 32px);
   max-width: 560px;
@@ -351,7 +369,7 @@ dialog { box-shadow: 0 24px 90px #302a2026; padding: 30px; }
   :root { --titlebar-h: 48px; --rail-w: 94px; }
   .main { padding-left: 32px; padding-right: 32px; }
   .workspace-toolbar { height: 82px; }
-  .exercise-layout { grid-template-columns: 330px minmax(0, 1fr); gap: 36px; height: calc(100dvh - var(--titlebar-h) - 118px); }
+  .exercise-layout { gap: 36px; height: calc(100dvh - var(--titlebar-h) - 118px); }
   .lesson-panel { padding-top: 22px; }
   #lesson-content h2 { font-size: 30px; }
   .terminal-header { min-height: 58px; }
@@ -426,11 +444,169 @@ dialog { box-shadow: 0 24px 90px #302a2026; padding: 30px; }
   .dialog-actions button { font-size: 11px; padding-left: 12px; padding-right: 12px; }
   .toast { right: 14px; left: 70px; bottom: 15px; font-size: 11px; }
 }
+/* Readability baseline: keep labels and body copy legible on every window size. */
+body { font-size: 15px; }
+.rail-item { font-size: 14px; }
+.breadcrumb { font-size: 20px; }
+.header-connection, .text-button { font-size: 14px; }
+.lesson-meta, .duration { font-size: 14px; }
+.difficulty-badge { font-size: 13px; }
+.lesson-subtitle { font-size: 16px; }
+.lesson-description { font-size: 15px; }
+.objective { font-size: 16px; }
+.objective small { font-size: 13px; }
+.objective-progress { font-size: 13px; }
+.exercise-files { font-size: 14px; }
+.exercise-files code { font-size: 13px; }
+.takeaway, .lesson-background { font-size: 12px; }
+.start-steps strong { font-size: 15px; }
+.start-steps p { font-size: 14px; }
+.hint-button, .primary-button { font-size: 15px; }
+.secondary-button { font-size: 14px; }
+.hint-content p { font-size: 13px; }
+pre { font-size: 12px; }
+.action-caption { font-size: 12px; }
+.scenario-link { font-size: 13px; }
+.group-name, .sidebar-caption { font-size: 12px; }
+.terminal-tab { font-size: 15px; }
+.terminal-overlay h3 { font-size: 22px; }
+.terminal-overlay p { font-size: 14px; }
+.overlay-note { font-size: 13px; }
+.terminal-footer { font-size: 12px; }
+#terminal-dimensions, .terminal-encoding { font-size: 11px; }
+dialog h2 { font-size: 22px; }
+dialog p { font-size: 13px; }
+.reference-list code, .reference-list span { font-size: 12px; }
+.guide-steps strong { font-size: 13px; }
+.guide-steps p { font-size: 12px; }
+
+@media (max-width: 680px) {
+  .rail-item { font-size: 13px; }
+  .brand { font-size: 14px; }
+  .breadcrumb { font-size: 16px; }
+  .text-button { font-size: 13px; }
+  #lesson-content h2 { font-size: 28px; }
+  .terminal-tab strong { font-size: 14px; }
+  .terminal-overlay h3 { font-size: 18px; }
+  .dialog-actions button { font-size: 13px; }
+  .toast { font-size: 12px; }
+}
+
+@media (min-width: 1800px) {
+  :root { --rail-w: 104px; --sidebar-w: 340px; --titlebar-h: 52px; }
+  .main { padding-left: 34px; padding-right: 30px; }
+  .workspace-toolbar { height: 90px; }
+  .titlebar-caption { font-size: 12px; }
+  .brand { font-size: 16px; }
+  .breadcrumb { font-size: 21px; }
+  .header-connection, .text-button { font-size: 16px; }
+  .rail-item { font-size: 16px; }
+  .rail-item .icon { width: 30px; height: 30px; }
+  .lesson-meta, .duration { font-size: 15px; }
+  .difficulty-badge { font-size: 14px; }
+  #lesson-content h2 { font-size: 34px; }
+  .lesson-subtitle { font-size: 17px; }
+  .lesson-description { font-size: 15px; }
+  .objective { font-size: 17px; }
+  .objective small { font-size: 14px; }
+  .objective-progress { font-size: 14px; }
+  .objectives-heading { font-size: 19px; }
+  .exercise-files { font-size: 15px; }
+  .exercise-files code { font-size: 14px; }
+  .takeaway, .lesson-background { font-size: 13px; }
+  .start-steps strong { font-size: 15px; }
+  .start-steps p { font-size: 14px; }
+  .hint-content p { font-size: 14px; }
+  pre { font-size: 13px; }
+  .hint-button, .primary-button, .secondary-button { font-size: 15px; }
+  .action-caption { font-size: 13px; }
+  .scenario-link { font-size: 13px; }
+  .group-name, .sidebar-caption { font-size: 13px; }
+  .sidebar-heading h2 { font-size: 21px; }
+  .generate-entry strong { font-size: 14px; }
+  .generate-entry small, .guide-link { font-size: 12px; }
+  .environment-card strong { font-size: 12px; }
+  .environment-card p { font-size: 11px; }
+  .active-challenge span, .active-challenge small { font-size: 11px; }
+  .active-challenge strong { font-size: 13px; }
+  .terminal-tab { font-size: 17px; }
+  .terminal-overlay h3 { font-size: 26px; }
+  .terminal-overlay p { font-size: 15px; }
+  .overlay-note { font-size: 13px; }
+  .terminal-footer { font-size: 13px; }
+  #terminal-dimensions, .terminal-encoding { font-size: 12px; }
+  dialog h2 { font-size: 24px; }
+  dialog p { font-size: 14px; }
+  .reference-list code, .reference-list span { font-size: 13px; }
+  .guide-steps strong { font-size: 14px; }
+  .guide-steps p { font-size: 13px; }
+}
+
+@media (min-width: 2300px) {
+  :root { --rail-w: 112px; --sidebar-w: 370px; --titlebar-h: 56px; }
+  .main { padding-left: 38px; padding-right: 34px; }
+  .workspace-toolbar { height: 96px; }
+  .titlebar-caption { font-size: 13px; }
+  .brand { font-size: 18px; }
+  .breadcrumb { font-size: 24px; }
+  .header-connection, .text-button { font-size: 17px; }
+  .rail-item { font-size: 18px; }
+  .rail-item .icon { width: 33px; height: 33px; }
+  .lesson-meta, .duration { font-size: 16px; }
+  .difficulty-badge { font-size: 15px; }
+  #lesson-content h2 { font-size: 38px; }
+  .lesson-subtitle { font-size: 19px; }
+  .lesson-description { font-size: 16px; }
+  .objective { font-size: 18px; }
+  .objective small { font-size: 15px; }
+  .objective-progress { font-size: 15px; }
+  .objectives-heading { font-size: 21px; }
+  .exercise-files { font-size: 16px; }
+  .exercise-files code { font-size: 15px; }
+  .takeaway, .lesson-background { font-size: 14px; }
+  .start-steps strong { font-size: 17px; }
+  .start-steps p { font-size: 15px; }
+  .hint-content p { font-size: 15px; }
+  pre { font-size: 14px; }
+  .hint-button, .primary-button, .secondary-button { font-size: 17px; }
+  .action-caption { font-size: 14px; }
+  .scenario-link { font-size: 15px; }
+  .group-name, .sidebar-caption { font-size: 14px; }
+  .sidebar-heading h2 { font-size: 24px; }
+  .generate-entry strong { font-size: 15px; }
+  .generate-entry small, .guide-link { font-size: 13px; }
+  .environment-card strong { font-size: 13px; }
+  .environment-card p { font-size: 12px; }
+  .active-challenge span, .active-challenge small { font-size: 12px; }
+  .active-challenge strong { font-size: 14px; }
+  .terminal-tab { font-size: 18px; }
+  .terminal-overlay h3 { font-size: 30px; }
+  .terminal-overlay p { font-size: 16px; }
+  .overlay-note { font-size: 14px; }
+  .terminal-footer { font-size: 14px; }
+  #terminal-dimensions, .terminal-encoding { font-size: 13px; }
+  dialog h2 { font-size: 26px; }
+  dialog p { font-size: 15px; }
+  .reference-list code, .reference-list span { font-size: 14px; }
+  .guide-steps strong { font-size: 15px; }
+  .guide-steps p { font-size: 14px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
 
-.lesson-background { margin: 10px 0 17px; color: var(--muted); font-size: 11px; }
+.lesson-background { margin: 10px 0 17px; color: var(--muted); font-size: 13px; }
 .lesson-background summary { cursor: pointer; padding: 3px 0; }
 .lesson-background[open] summary { margin-bottom: 9px; color: var(--accent); }
-.lesson-background .lesson-description { font-size: 12px; }
+.lesson-background .lesson-description { font-size: 15px; }
+
+@media (min-width: 1800px) {
+  .lesson-background { font-size: 14px; }
+  .lesson-background .lesson-description { font-size: 16px; }
+}
+
+@media (min-width: 2300px) {
+  .lesson-background { font-size: 15px; }
+  .lesson-background .lesson-description { font-size: 17px; }
+}

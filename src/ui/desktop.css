@@ -1,0 +1,61 @@
+/* Desktop reading sizes are independent of the compact browser layout. */
+html[data-desktop] {
+  --reading-body: clamp(16px, .8vw, 20px);
+  --reading-task: clamp(17px, .9vw, 21px);
+  --reading-label: clamp(14px, .7vw, 18px);
+  --reading-caption: clamp(13px, .6vw, 16px);
+  --muted: #76796f;
+  --faint: #909388;
+}
+
+html[data-desktop] body { font-size: var(--reading-body); }
+html[data-desktop] #lesson-content h2 { font-size: clamp(29px, 1.65vw, 42px); }
+html[data-desktop] :is(.objective, .lesson-subtitle) { font-size: var(--reading-task); line-height: 1.8; }
+html[data-desktop] :is(
+  .lesson-description, .lesson-background .lesson-description,
+  .start-steps strong, .start-steps p, .hint-content h3, .hint-content p,
+  .primary-button, .secondary-button, .hint-button, .next-button,
+  dialog p, .guide-steps strong, .settings-row label, .settings-environment h3,
+  .history-list h3, .palette-item-label
+) { font-size: var(--reading-body); }
+
+html[data-desktop] :is(
+  .rail-item, .lesson-meta, .duration, .difficulty-badge, .objective small,
+  .objective-progress, .exercise-files, .takeaway, .lesson-background,
+  .scenario-link, .group-name, .generate-entry strong, .topic-group legend,
+  .topic-option strong, .generation-scope strong, .generation-fields label,
+  .generation-fields select, .generation-focus, .generation-focus textarea,
+  .reference-list code, .reference-list span, .guide-steps p,
+  .terminal-tab, .reset-button, .header-connection, .text-button,
+  .settings-row select, .toast
+) { font-size: var(--reading-label); }
+
+html[data-desktop] :is(
+  .titlebar-caption, .sidebar-caption, .generate-entry small,
+  .scenario-count, .group-count, .group-index, .progress-label,
+  .progress-caption, .environment-card strong, .environment-card p, .guide-link,
+  .active-challenge span, .active-challenge small, .active-challenge strong,
+  .generation-label, .generation-label button, .action-caption,
+  .exercise-files code, .code-heading, .check-shortcut, .result-message,
+  .result-message p, .topic-option small, .topic-group-count,
+  .generation-scope span, .generation-focus small, .section-label,
+  .dialog-eyebrow, .settings-row small, .history-list article > span,
+  .palette-item-hint, .palette-footer, .terminal-footer, .connection-detail,
+  .terminal-encoding, #terminal-dimensions, #generator-selected
+) { font-size: var(--reading-caption); }
+
+html[data-desktop] :is(#scenario-filter, #generator-filter) { font-size: var(--reading-label); }
+html[data-desktop] :is(.generation-note, .dialog-footnote) { font-size: var(--reading-caption) !important; }
+html[data-desktop] pre { font-size: var(--reading-label); }
+html[data-desktop] :is(.primary-button, .secondary-button) { min-height: 44px; }
+html[data-desktop] .settings-row { align-items: flex-start; }
+html[data-desktop] .scenario-link { padding-top: 9px; padding-bottom: 9px; }
+html[data-desktop] .scenario-filter-row { min-height: 36px; }
+html[data-desktop] .generation-label { flex-wrap: wrap; row-gap: 5px; }
+html[data-desktop] .generation-label button { white-space: nowrap; }
+
+@media (max-width: 680px) {
+  html[data-desktop] .rail-item { font-size: 13px; }
+  html[data-desktop] .breadcrumb { font-size: 15px; }
+  html[data-desktop] .terminal-footer { gap: 8px; }
+}

@@ -8,4 +8,7 @@ contextBridge.exposeInMainWorld('shellLabDesktop', {
   copyText(text) {
     return ipcRenderer.invoke('shell-lab:clipboard-write', text);
   },
+  setZoom(factor) {
+    return ipcRenderer.invoke('shell-lab:set-zoom', factor);
+  },
 });

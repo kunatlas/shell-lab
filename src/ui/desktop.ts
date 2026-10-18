@@ -2,6 +2,7 @@ export interface DesktopBridge {
   platform: string;
   windowAction(action: 'minimize' | 'maximize' | 'close'): void;
   copyText(text: string): Promise<void>;
+  setZoom(factor: number): Promise<void>;
 }
 
 declare global {
