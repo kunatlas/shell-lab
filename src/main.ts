@@ -2,27 +2,24 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import './style.css';
-import type { Bootstrap, CheckResult, Lesson, RuntimeHealth, SessionInfo, GeneratorInfo, GenerationOptions, Difficulty } from '../shared/types.js';
+import { icon } from './ui/icons.js';
+import { shellMarkup } from './ui/shell.js';
+import { bindDesktopControls, writeClipboard } from './ui/desktop.js';
+import type { Bootstrap, CheckResult, Lesson, RuntimeHealth, SessionInfo, GeneratorInfo, GenerationOptions, Difficulty, ScenarioTopic } from '../shared/types.js';
 
-const paths: Record<string, string> = {
-  terminal: '<path d="m5 6 6 6-6 6m9 0h5"/>',
-  book: '<path d="M4 4h6a3 3 0 0 1 3 3v14a4 4 0 0 0-4-3H4zm16 0h-4a3 3 0 0 0-3 3v14a4 4 0 0 1 4-3h3z"/>',
-  arrow: '<path d="M5 12h14m-6-6 6 6-6 6"/>',
-  check: '<path d="m5 12 4 4L19 6"/>',
-  chevron: '<path d="m9 5 7 7-7 7"/>',
-  reset: '<path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/>',
-  bulb: '<path d="M9 18h6m-5 3h4M8.5 15.5a6 6 0 1 1 7 0L15 18H9z"/>',
-  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-  copy: '<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
-  close: '<path d="m6 6 12 12M6 18 18 6"/>',
-  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
-  shield: '<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6z"/><path d="m8 12 3 3 5-6"/>',
-  code: '<path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 20"/>',
-  spark: '<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/>',
-};
-const icon = (name: string, className = '') => `<svg class="icon ${className}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] ?? paths.terminal}</svg>`;
 const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
 const $ = <T extends Element = HTMLElement>(selector: string): T => document.querySelector<T>(selector)!;
+const paletteShortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K';
+
+interface GroupMeta { id: string; name: string }
+const groupMeta: GroupMeta[] = [
+  { id: 'diagnose', name: '排查与诊断' },
+  { id: 'files', name: '文件与数据' },
+  { id: 'release', name: '发布与工程' },
+  { id: 'remote', name: 'SSH 与远程' },
+];
+
+interface PaletteItem { id: string; label: string; hint: string; run: () => void }
 
 let selected: Lesson | null = null;
 let health: RuntimeHealth;
@@ -39,17 +36,25 @@ let hintVisible = false;
 let completed = new Set<string>();
 try { completed = new Set(JSON.parse(localStorage.getItem('shell-lab-progress-v1') ?? '[]')); } catch { /* Private browsing may block storage. */ }
 
+let scenarioFilter = '';
+const collapsedGroups = new Set<string>();
+let paletteIndex = 0;
+let paletteItems: PaletteItem[] = [];
+let paletteReturnFocus: HTMLElement | null = null;
+let dialogReturnFocus: HTMLElement | null = null;
+let drawerOpen = false;
+const mobileQuery = window.matchMedia('(max-width: 680px)');
+
 const terminal = new Terminal({
-  cursorBlink: true, cursorStyle: 'bar', fontSize: 14, lineHeight: 1.45,
-  fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace',
+  cursorBlink: true, cursorStyle: 'block', fontSize: 14, lineHeight: 1.6,
+  fontFamily: '"SFMono-Regular", "Cascadia Code", "JetBrains Mono", "IBM Plex Mono", "Liberation Mono", Menlo, Consolas, monospace',
   scrollback: 5000, allowProposedApi: false,
   theme: {
-    background: '#0b1015', foreground: '#d2dce5', cursor: '#b4f272', selectionBackground: '#30452c',
-    black: '#26313c', red: '#f08080', green: '#b4f272', yellow: '#e8c47d',
-    blue: '#8bbcf2', magenta: '#c9a4ef', cyan: '#7dcfc9', white: '#d2dce5',
-    brightBlack: '#738497', brightRed: '#f8a3a3', brightGreen: '#c6ff8e',
-    brightYellow: '#f3d592', brightBlue: '#b1d2ff', brightMagenta: '#ddc2ff',
-    brightCyan: '#a6e9e3', brightWhite: '#f1f5f9',
+    background: '#252626', foreground: '#deded8', cursor: '#e8e5dd', cursorAccent: '#252626', selectionBackground: '#55564e',
+    black: '#16202c', red: '#d38b70', green: '#a7bfa0', yellow: '#e7b65a',
+    blue: '#8ab4f8', magenta: '#c8a8f0', cyan: '#7ed8d0', white: '#d9e4f0',
+    brightBlack: '#4a5e72', brightRed: '#ff9a9a', brightGreen: '#9cffc4', brightYellow: '#f2cc86',
+    brightBlue: '#afcbff', brightMagenta: '#dfc7ff', brightCyan: '#a8ede7', brightWhite: '#f2f7fc',
   },
 });
 const fitAddon = new FitAddon();
@@ -61,6 +66,33 @@ terminal.onResize(({ cols, rows }) => {
   if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'resize', cols, rows }));
 });
 
+function topicMap(): Map<string, ScenarioTopic> {
+  return new Map(generator.topics.map((topic) => [topic.id, topic]));
+}
+
+function groupOf(topic: ScenarioTopic): string {
+  return groupMeta.some((group) => group.id === topic.group) ? topic.group : 'other';
+}
+
+function groupLabel(id: string): string {
+  return groupMeta.find((group) => group.id === id)?.name ?? '更多场景';
+}
+
+function allGroups(): GroupMeta[] {
+  return generator.topics.some((topic) => groupOf(topic) === 'other')
+    ? [...groupMeta, { id: 'other', name: '更多场景' }]
+    : groupMeta;
+}
+
+function topicMatches(topic: ScenarioTopic, query: string): boolean {
+  const fields = [topic.name, topic.id, topic.description, ...topic.concepts, ...topic.tools, groupLabel(groupOf(topic))];
+  return fields.join(' ').toLowerCase().includes(query);
+}
+
+function fitTerminal(): void {
+  requestAnimationFrame(() => { try { fitAddon.fit(); } catch { /* Terminal is not attached yet. */ } });
+}
+
 async function api<T>(path: string, body?: object): Promise<T> {
   const response = await fetch(`/api/${path}`, body === undefined ? {} : {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -71,105 +103,253 @@ async function api<T>(path: string, body?: object): Promise<T> {
 }
 
 function layout() {
-  $('#app').innerHTML = `
-    <header class="topbar">
-      <button class="icon-button mobile-menu" id="menu" aria-label="打开练习列表">${icon('menu')}</button>
-      <a class="brand" href="/" aria-label="ShellLab 首页"><span class="brand-symbol">${icon('terminal')}</span><span>shell<span class="brand-light">lab</span><span class="brand-dot">.</span></span></a>
-      <span class="topbar-divider"></span><span class="topbar-caption">Shell 练习室</span>
-      <div class="topbar-right"><span class="version">V 0.1</span><button class="text-button" id="reference">${icon('book')}<span>命令速查</span><kbd>?</kbd></button></div>
-    </header>
-    <div class="app-layout">
-      <aside class="sidebar" id="sidebar">
-        <div class="sidebar-heading"><span>开发实战</span><span class="tiny-label">LEARN BY DOING</span></div>
-        <button class="generate-entry" data-open-generator>${icon('spark')}<span><strong>生成开发实战</strong><small>按场景与难度，自动出新题</small></span>${icon('arrow')}</button>
-        <div id="active-challenge"></div>
-        <div class="curriculum-label">开发场景</div>
-        <nav id="scenarios" aria-label="开发场景"></nav>
-        <div class="sidebar-bottom">
-          <div class="progress-label"><span>已完成实战</span><strong id="progress-number">0 题</strong></div>
-          <p class="progress-caption" id="challenge-progress">每一条命令，都是一次进步。</p>
-          <div class="environment-card"><div class="environment-icon">${icon('shield')}</div><div><strong id="environment-label">独立练习环境</strong><p id="environment-caption">真实 Shell，即时反馈</p></div></div>
-          <button class="guide-link" id="guide">第一次使用？查看练习指南 ${icon('arrow')}</button>
-        </div>
-      </aside>
-      <main class="main">
-        <div class="breadcrumb">开发实战 ${icon('chevron')} <span id="chapter-name"></span></div>
-        <div class="workspace-heading"><div><div class="eyebrow">A LITTLE PRACTICE, EVERY DAY</div><h1>把命令，变成直觉<span>。</span></h1><p>从日志排障到应用发布，练习后端开发的日常。</p></div><div class="workspace-badge">${icon('terminal')}<span>交互式实验室</span></div></div>
-        <div class="exercise-layout">
-          <section class="lesson-panel" aria-label="练习说明"><div id="lesson-content"></div><div class="lesson-actions"><button class="hint-button" id="hint">${icon('bulb')}<span>给我一点提示</span></button><button class="primary-button" id="check">检查结果 ${icon('arrow')}</button></div></section>
-          <section class="terminal-panel" aria-label="Linux 交互式终端">
-            <div class="terminal-header"><div class="terminal-tab">${icon('terminal')}<span>bash</span><span class="terminal-tab-dot"></span></div><div class="terminal-tools"><button class="icon-button" id="clear" title="清空终端显示（保留文件和会话）" aria-label="清空终端显示">${icon('spark')}</button><span class="tool-divider"></span><button class="reset-button" id="reset">${icon('reset')} 重置环境</button></div></div>
-            <div class="terminal-welcome"><span class="terminal-welcome-title">WELCOME TO SHELLLAB</span><span>真实环境，自由探索。</span></div>
-            <div class="terminal-area"><div id="terminal"></div><div class="terminal-overlay" id="terminal-overlay" hidden></div></div>
-            <div class="terminal-footer"><span class="connection"><i id="connection-dot"></i><span id="connection-label">准备连接</span></span><span id="terminal-dimensions"></span><span class="terminal-key-hint"><kbd>Tab</kbd> 补全 <span>·</span> <kbd>↑</kbd> 历史 <span>·</span> <kbd>Ctrl C</kbd> 中断</span></div>
-          </section>
-        </div>
-        <div class="workspace-footer"><span>${icon('code')} 从输入到结果，每一步都真实发生。</span><span>小步练习，持续积累 <span class="footer-star">✳</span></span></div>
-      </main>
-    </div>
-    <dialog id="dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>
-    <div class="toast" id="toast" role="status" hidden></div>`;
+  $('#app').innerHTML = shellMarkup(generator.topics.length, paletteShortcut);
+  bindDesktopControls();
   terminal.open($('#terminal'));
   new ResizeObserver(() => {
-    fitAddon.fit();
+    fitTerminal();
     $('#terminal-dimensions').textContent = `${terminal.cols} × ${terminal.rows}`;
   }).observe($('#terminal'));
-  $('#menu').addEventListener('click', () => $('#sidebar').classList.toggle('is-open'));
+  $('#menu').addEventListener('click', () => setDrawer(!drawerOpen));
+  $('#sidebar-scrim').addEventListener('click', () => setDrawer(false));
   $('#reference').addEventListener('click', showReference);
+  $('#practice-nav').addEventListener('click', () => { setDrawer(false); $('#main-content').focus(); });
+  $('#history-nav').addEventListener('click', showHistory);
+  $('#settings-nav').addEventListener('click', showSettings);
+  $('#skip').addEventListener('click', showGenerator);
+  $('#fullscreen').addEventListener('click', toggleTerminal);
+  $('#sidebar-close').addEventListener('click', () => setDrawer(false));
   $('#guide').addEventListener('click', showGuide);
   document.querySelectorAll('[data-open-generator]').forEach((button) => button.addEventListener('click', showGenerator));
   $('#hint').addEventListener('click', () => { hintVisible = !hintVisible; renderLesson(); });
   $('#check').addEventListener('click', () => void check());
   $('#clear').addEventListener('click', () => { terminal.clear(); terminal.focus(); });
-  $('#reset').addEventListener('click', () => {
-    if (busy || checking) return;
-    if (!session || !selected) { showGenerator(); return; }
-    confirmAction('重新开始这道练习？', '当前练习中的文件、变量和命令历史会被清空，已完成的学习进度会保留。', '重置环境', () => void createSession());
+  $('#reset').addEventListener('click', requestReset);
+  $('#scenarios').addEventListener('click', onScenarioClick);
+  $<HTMLInputElement>('#scenario-filter').addEventListener('input', (event) => {
+    scenarioFilter = (event.target as HTMLInputElement).value;
+    applyScenarioView();
+  });
+  $('#scenario-clear').addEventListener('click', () => {
+    const input = $<HTMLInputElement>('#scenario-filter');
+    input.value = ''; scenarioFilter = ''; input.focus(); applyScenarioView();
+  });
+  $('#palette-trigger').addEventListener('click', openPalette);
+  $<HTMLInputElement>('#palette-input').addEventListener('input', () => { paletteIndex = 0; renderPalette(); });
+  $<HTMLInputElement>('#palette-input').addEventListener('keydown', onPaletteKeydown);
+  $('#palette-list').addEventListener('click', (event) => {
+    const option = (event.target as HTMLElement).closest<HTMLElement>('[data-palette-index]');
+    if (option) activatePaletteItem(Number(option.dataset.paletteIndex));
+  });
+  $<HTMLDialogElement>('#dialog').addEventListener('close', restoreDialogFocus);
+  $<HTMLDialogElement>('#palette').addEventListener('close', () => {
+    paletteReturnFocus?.focus(); paletteReturnFocus = null;
   });
   $('#dialog').addEventListener('click', (event) => { if (event.target === $('#dialog')) closeDialog(); });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === '?' && !(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLTextAreaElement) && !$('#dialog').hasAttribute('open')) showReference();
-  });
+  $('#palette').addEventListener('click', (event) => { if (event.target === $('#palette')) closePalette(); });
+  document.addEventListener('keydown', onGlobalKeydown);
+  mobileQuery.addEventListener('change', syncDrawerMode);
+  syncDrawerMode();
+  try {
+    const savedSize = Number(localStorage.getItem('shell-lab-font-size'));
+    if (savedSize >= 12 && savedSize <= 20) terminal.options.fontSize = savedSize;
+  } catch { /* Use the default font size when storage is unavailable. */ }
+}
+
+function onScenarioClick(event: Event) {
+  const target = event.target as HTMLElement;
+  const toggle = target.closest<HTMLElement>('[data-group-toggle]');
+  if (toggle) {
+    const id = toggle.dataset.groupToggle!;
+    if (collapsedGroups.has(id)) collapsedGroups.delete(id); else collapsedGroups.add(id);
+    applyScenarioView();
+    return;
+  }
+  const topic = target.closest<HTMLButtonElement>('[data-topic]');
+  if (topic && !topic.disabled) selectTopic(topic.dataset.topic!);
+}
+
+function selectTopic(id: string) {
+  if (busy || checking) return;
+  generationPreferences = { ...generationPreferences, topics: [id], difficulty: 'basic' };
+  setDrawer(false, false);
+  showGenerator();
+}
+
+function requestReset() {
+  if (busy || checking) return;
+  if (!session || !selected) { showGenerator(); return; }
+  confirmAction('重新开始这道练习？', '当前练习中的文件、变量和命令历史会被清空，已完成的学习进度会保留。', '重置环境', () => void createSession());
+}
+
+function setDrawer(open: boolean, restoreFocus = true) {
+  const sidebar = $('#sidebar');
+  const menu = $('#menu');
+  $('#app').classList.toggle('library-open', open);
+  menu.classList.toggle('active', open);
+  $('#practice-nav').classList.toggle('active', !open);
+  $('#practice-nav').setAttribute('aria-current', !open ? 'page' : 'false');
+  drawerOpen = open;
+  sidebar.classList.toggle('is-open', open);
+  menu.setAttribute('aria-expanded', String(open));
+  $('#sidebar-scrim').hidden = !open;
+  if (open) {
+    sidebar.removeAttribute('inert');
+    requestAnimationFrame(() => $<HTMLInputElement>('#scenario-filter').focus());
+  } else {
+    sidebar.setAttribute('inert', '');
+    if (restoreFocus) menu.focus();
+  }
+  fitTerminal();
+}
+
+function syncDrawerMode() {
+  setDrawer(drawerOpen, false);
+}
+
+function onGlobalKeydown(event: KeyboardEvent) {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault();
+    if ($<HTMLDialogElement>('#palette').open) closePalette();
+    else openPalette();
+    return;
+  }
+  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && !anyDialogOpen()) {
+    event.preventDefault(); void check(); return;
+  }
+  if (event.key === 'Escape' && $('#app').classList.contains('terminal-expanded') && !anyDialogOpen()) { toggleTerminal(); return; }
+  if (event.key === 'Escape' && drawerOpen) { setDrawer(false); return; }
+  if (drawerOpen && event.key === 'Tab') {
+    const focusable = [...$('#sidebar').querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), a[href], select, textarea')]
+      .filter((element) => element.getClientRects().length > 0);
+    if (focusable.length) {
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+    return;
+  }
+  if (event.key === '/' && !isTypingTarget(event.target) && !anyDialogOpen()) {
+    event.preventDefault(); setDrawer(true); return;
+  }
+  if (event.key === '?' && !isTypingTarget(event.target) && !anyDialogOpen()) showReference();
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
+    || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable);
+}
+
+function anyDialogOpen(): boolean {
+  return $<HTMLDialogElement>('#dialog').open || $<HTMLDialogElement>('#palette').open;
 }
 
 function renderSidebar() {
   $('#active-challenge').innerHTML = selected?.generated ? `<div class="active-challenge"><span>当前实战 · ${selected.generated.source === 'ai' ? 'AI 场景规划' : '本地动态出题'}</span><strong>${escape(selected.title)}</strong><small>${selected.generated.verified ? '已通过真实环境试做验证' : '等待验证'}</small></div>` : '';
-  $('#scenarios').innerHTML = generator.topics.map((topic) => `<button class="scenario-link ${selected?.generated?.topics.includes(topic.id) ? 'active' : ''}" data-topic="${topic.id}" title="${escape(topic.available ? topic.description : topic.unavailableReason ?? '环境未就绪')}" ${topic.available ? '' : 'disabled'}>${icon('chevron')}<span>${escape(topic.name)}</span></button>`).join('');
-  document.querySelectorAll<HTMLButtonElement>('[data-topic]').forEach((button) => button.addEventListener('click', () => {
-    if (busy || checking) return;
-    generationPreferences = { ...generationPreferences, topics: [button.dataset.topic!], difficulty: 'basic' };
-    showGenerator();
-  }));
+  renderScenarioGroups();
+  applyScenarioView();
   const challenges = [...completed].filter((id) => id.startsWith('generated-')).length;
   $('#progress-number').textContent = `${challenges} 题`;
   $('#challenge-progress').textContent = challenges ? `实战累计完成 ${challenges} 题，继续挑战。` : '选择场景，开始你的第一道实战。';
 }
 
+function renderScenarioGroups() {
+  const groups = allGroups();
+  $('#scenarios').innerHTML = groups.map((group, index) => {
+    const topics = generator.topics.filter((topic) => groupOf(topic) === group.id);
+    if (!topics.length) return '';
+    const activeGroup = topics.some((topic) => selected?.generated?.topics.includes(topic.id));
+    return `<section class="scenario-group" data-group="${group.id}">
+      <button class="group-toggle" data-group-toggle="${group.id}" aria-expanded="true" aria-controls="group-${group.id}">
+        <span class="group-caret" aria-hidden="true">${icon('chevron')}</span>
+        <span class="group-index" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
+        <span class="group-name">${escape(group.name)}</span>
+        <span class="group-count" aria-hidden="true">${String(topics.length).padStart(2, '0')}</span>
+        ${activeGroup ? '<span class="group-active" aria-hidden="true"></span>' : ''}
+      </button>
+      <div class="group-body" id="group-${group.id}" role="group" aria-label="${escape(group.name)}">
+        ${topics.map((topic) => {
+          const active = Boolean(selected?.generated?.topics.includes(topic.id));
+          const reason = topic.unavailableReason ?? '环境未就绪';
+          return `<button class="scenario-link${active ? ' active' : ''}" data-topic="${topic.id}"${active ? ' aria-current="true"' : ''}${topic.available ? ` title="${escape(topic.description)}"` : ` disabled aria-label="${escape(topic.name)} — ${escape(reason)}"`}><span class="scenario-name">${escape(topic.name)}</span></button>`;
+        }).join('')}
+      </div>
+    </section>`;
+  }).join('') + '<p id="scenario-empty" hidden>没有匹配的场景。</p>';
+}
+
+function applyScenarioView() {
+  const query = scenarioFilter.trim().toLowerCase();
+  const topics = topicMap();
+  let total = 0;
+  document.querySelectorAll<HTMLElement>('.scenario-group').forEach((section) => {
+    const groupId = section.dataset.group!;
+    const body = section.querySelector<HTMLElement>('.group-body')!;
+    const toggle = section.querySelector<HTMLElement>('[data-group-toggle]')!;
+    const links = [...section.querySelectorAll<HTMLButtonElement>('.scenario-link')];
+    let matched = 0;
+    for (const link of links) {
+      const topic = topics.get(link.dataset.topic!);
+      const match = !query || Boolean(topic && topicMatches(topic, query));
+      link.hidden = !match;
+      if (match) matched++;
+    }
+    total += matched;
+    section.hidden = matched === 0;
+    const expanded = query ? true : !collapsedGroups.has(groupId);
+    toggle.setAttribute('aria-expanded', String(expanded));
+    body.hidden = !expanded;
+    const count = section.querySelector<HTMLElement>('.group-count')!;
+    count.textContent = query ? `${matched}/${links.length}` : String(links.length).padStart(2, '0');
+  });
+  $('#scenario-count').textContent = query ? `${total} / ${generator.topics.length}` : String(generator.topics.length);
+  $('#scenario-empty').hidden = !(query && total === 0);
+  $<HTMLButtonElement>('#scenario-clear').hidden = !query;
+}
+
 function renderLesson() {
+  updateLessonPane();
   if (!selected) {
     $('#chapter-name').textContent = '选择练习场景';
-    $('#lesson-content').innerHTML = `<div class="lesson-meta"><span class="lesson-label">动态开发实战</span></div><h2>从一个开发场景开始</h2><p class="lesson-subtitle">选择你想练习的工作任务，让系统生成新题。</p><div class="lesson-divider"></div><h3>按你的需要练习</h3><p class="lesson-description">日志排查、配置修改、Git、SSH/SCP、HTTP 接口、进程管理……选择一个专项，或组合多个场景挑战自己。</p><ol class="objectives"><li class="objective"><span class="objective-marker">1</span><span>点击左侧“生成开发实战”，或选择一个具体场景。</span></li><li class="objective"><span class="objective-marker">2</span><span>选择难度，生成已在真实环境中验证过的题目。</span></li><li class="objective"><span class="objective-marker">3</span><span>在 Bash 终端中操作，检查结果后继续生成新题。</span></li></ol><div class="takeaway">${icon('bulb')}<p>支持专项和组合实战，随时查看提示和命令速查。</p></div>`;
+    $('#lesson-content').innerHTML = `<div class="lesson-empty">
+      <div class="lesson-meta"><span>准备开始</span><span class="difficulty-badge">实战</span></div>
+      <h2>从一个开发场景开始</h2>
+      <p class="lesson-subtitle">选择你想练习的工作任务，让系统生成新题。</p>
+      <div class="lesson-divider"></div>
+      <p class="lesson-description">日志排查、配置修改、Git、SSH/SCP、HTTP 接口、进程管理……选择一个专项，或组合多个场景挑战自己。</p>
+      <ol class="start-steps">
+        <li><span class="step-index">01</span><div><strong>选择场景</strong><p>打开场景库，选择一项日常开发任务。</p></div></li>
+        <li><span class="step-index">02</span><div><strong>生成并验证</strong><p>选择难度，生成已在真实环境中试做通过的题目。</p></div></li>
+        <li><span class="step-index">03</span><div><strong>动手检查</strong><p>在 Bash 终端中操作，检查结果后继续生成新题。</p></div></li>
+      </ol>
+      <div class="takeaway"><span class="takeaway-label">NOTE</span><p>支持专项和组合实战，随时查看提示和命令速查。</p></div>
+    </div>`;
     updateButtons();
     return;
   }
   const lesson = selected;
   $('#chapter-name').textContent = lesson.chapter;
   $('#lesson-content').innerHTML = `
-    <div class="lesson-meta"><span class="lesson-label">动态实战</span><span class="duration">${icon('clock')} 约 ${lesson.minutes} 分钟</span></div>
+    <div class="lesson-meta"><span>当前练习</span><span class="difficulty-badge">${difficultyLabel(lesson.generated?.difficulty)}</span></div>
     <h2>${escape(lesson.title)}</h2><p class="lesson-subtitle">${escape(lesson.subtitle)}</p>
-    <div class="concepts">${lesson.concepts.map((concept) => `<code>${escape(concept)}</code>`).join('')}</div>
-    ${lesson.generated ? `<div class="generation-label">${icon('check')} 已在真实环境中试做通过 <button id="change-challenge">换一道题 ${icon('reset')}</button></div>` : ''}
+    <p class="duration">预计 ${lesson.minutes} 分钟 <span>·</span> ${escape(lesson.concepts.slice(0, 2).join('与'))}</p>
+    ${lesson.generated ? `<div class="generation-label">${icon('check')}<span>已在真实环境中试做通过</span><button id="change-challenge">换一道题 ${icon('reset')}</button></div>` : ''}
     <div class="lesson-divider"></div>
-    <h3>这次的任务</h3><p class="lesson-description">${escape(lesson.description)}</p>
-    <ol class="objectives">${lesson.objectives.map((objective, i) => {
+    <h3 class="objectives-heading">任务目标</h3>
+    <details class="lesson-background"><summary>查看任务背景</summary><p class="lesson-description">${escape(lesson.description)}</p></details>
+    <ol class="objectives">${lesson.objectives.map((objective) => {
       const state = result?.results.find((item) => item.id === objective.id);
-      return `<li class="objective ${state ? state.passed ? 'passed' : 'failed' : ''}"><span class="objective-marker">${state?.passed ? icon('check') : i + 1}</span><span>${escape(objective.text)}${state && !state.passed ? '<small>尚未达到目标，再检查一下。</small>' : ''}</span></li>`;
+      return `<li class="objective ${state ? state.passed ? 'passed' : 'failed' : ''}"><span class="objective-marker" aria-label="${state?.passed ? '已完成' : '待完成'}">${state?.passed ? icon('check') : ''}</span><span>${escape(objective.text)}${state && !state.passed ? '<small>尚未达到目标，再检查一下。</small>' : ''}</span></li>`;
     }).join('')}</ol>
-    <div class="takeaway">${icon('bulb')}<p>${escape(lesson.takeaway)}</p></div>
-    ${hintVisible ? `<div class="hint-content"><h3>试试这个思路</h3><p>${escape(lesson.hint)}</p><div class="code-heading"><span>参考写法</span><button class="icon-button" id="copy-example" aria-label="复制参考命令">${icon('copy')}</button></div><pre><code>${escape(lesson.example)}</code></pre></div>` : ''}
+    <p class="objective-progress">已完成 ${result?.results.filter((item) => item.passed).length ?? 0} / ${lesson.objectives.length}</p>
+    <div class="exercise-files">${icon('folder')}<span>练习文件</span><code title="${escape(session?.workspace ?? '')}">${escape(relativeWorkspace())}</code></div>
+    <div class="takeaway"><p>${escape(lesson.takeaway)}</p></div>
+    ${hintVisible ? `<div class="hint-content"><div class="code-heading"><span class="hint-title">$ hint --show</span><button class="icon-button" id="copy-example" aria-label="复制参考命令">${icon('copy')}</button></div><h3>试试这个思路</h3><p>${escape(lesson.hint)}</p><div class="code-heading code-heading-reference"><span>参考写法</span></div><pre><code>${escape(lesson.example)}</code></pre></div>` : ''}
     ${result ? `<div class="result-message ${result.passed ? 'success' : ''}" role="status">${result.passed ? `${icon('check')}<div><strong>做得好，练习完成！</strong><p>所有目标都已通过检查。</p></div>` : `<div><strong>已经完成 ${result.results.filter((item) => item.passed).length} / ${result.results.length} 个目标</strong><p>查看上面的反馈，调整后可以再次检查。</p></div>`}</div>` : ''}
-    ${result?.passed && lesson.generated ? `<button class="next-button" id="another">再生成一道开发实战 ${icon('spark')}</button>` : ''}
-    `;
+    ${result?.passed && lesson.generated ? `<button class="next-button" id="another">再生成一道开发实战 ${icon('spark')}</button>` : ''}`;
+  $('#terminal-workspace').textContent = relativeWorkspace();
+  $('#terminal-workspace').title = session?.workspace ?? '';
   $('#hint').classList.toggle('selected', hintVisible);
   $('#hint span').textContent = hintVisible ? '收起提示' : '给我一点提示';
   document.querySelector('#copy-example')?.addEventListener('click', () => void copy(lesson.example));
@@ -178,11 +358,75 @@ function renderLesson() {
   updateButtons();
 }
 
+function difficultyLabel(difficulty?: Difficulty): string {
+  return difficulty === 'advanced' ? '进阶' : difficulty === 'intermediate' ? '综合' : '基础';
+}
+
+function relativeWorkspace(): string {
+  return '~/workspace';
+}
+
+function toggleTerminal() {
+  const expanded = $('#app').classList.toggle('terminal-expanded');
+  const button = $('#fullscreen');
+  button.setAttribute('aria-pressed', String(expanded));
+  button.setAttribute('aria-label', expanded ? '收起终端' : '展开终端');
+  button.title = expanded ? '收起终端 · Esc' : '展开终端';
+  button.innerHTML = icon(expanded ? 'collapse' : 'expand');
+  fitTerminal();
+  terminal.focus();
+}
+
+interface HistoryEntry { id: string; title: string; chapter: string; completedAt: string }
+function readHistory(): HistoryEntry[] {
+  try {
+    const entries: unknown = JSON.parse(localStorage.getItem('shell-lab-history-v1') ?? '[]');
+    return Array.isArray(entries) ? entries.filter((entry): entry is HistoryEntry => entry && typeof entry.id === 'string' && typeof entry.title === 'string' && typeof entry.chapter === 'string' && typeof entry.completedAt === 'string') : [];
+  } catch { return []; }
+}
+function saveHistory(lesson: Lesson) {
+  try {
+    const entries = readHistory().filter((entry) => entry.id !== lesson.id);
+    entries.unshift({ id: lesson.id, title: lesson.title, chapter: lesson.chapter, completedAt: new Date().toISOString() });
+    localStorage.setItem('shell-lab-history-v1', JSON.stringify(entries.slice(0, 100)));
+  } catch { /* Completing an exercise does not depend on browser storage. */ }
+}
+function showHistory() {
+  setDrawer(false, false);
+  const entries = readHistory();
+  showDialog(`<div class="dialog-eyebrow">YOUR PRACTICE</div><h2 id="dialog-title">练习历史</h2><p>每一步练习，都在这里留下足迹。记录保存在当前设备。</p><div class="history-list">${entries.length ? entries.map((entry) => `<article>${icon('check')}<div><h3>${escape(entry.title)}</h3><p>${escape(entry.chapter)} · ${escape(new Date(entry.completedAt).toLocaleDateString('zh-CN'))}</p></div><span>已完成</span></article>`).join('') : `<div class="history-empty">${icon('clock')}<h3>下一次进步，从现在开始</h3><p>完成一道练习后，这里会记录你的实战成果。</p></div>`}</div>`, 'history');
+}
+function showSettings() {
+  setDrawer(false, false);
+  showDialog(`<div class="dialog-eyebrow">MAKE IT YOURS</div><h2 id="dialog-title">练习设置</h2><p>让工作区更适合你的节奏。</p><div class="settings-row"><label for="terminal-font-size">终端字号<small>调整后立即生效，自动保存在当前设备</small></label><select id="terminal-font-size" aria-label="终端字号">${[12, 13, 14, 15, 16, 18, 20].map((size) => `<option value="${size}" ${size === terminal.options.fontSize ? 'selected' : ''}>${size} px</option>`).join('')}</select></div><div class="settings-environment">${icon('shield')}<div><h3>${health.mode === 'local' ? '本机开发环境 · 未隔离' : '独立 Linux 练习环境'}</h3><p>${escape(health.message)}</p></div></div><p class="dialog-footnote">ShellLab · 真实命令，真实进步。</p>`, 'settings');
+  $('#terminal-font-size').addEventListener('change', (event) => {
+    const size = Number((event.target as HTMLSelectElement).value);
+    terminal.options.fontSize = size;
+    try { localStorage.setItem('shell-lab-font-size', String(size)); } catch { /* The current setting still applies. */ }
+    fitTerminal();
+  });
+}
+
+function updateLessonPane() {
+  const state = $('#lesson-state');
+  const meta = $('#lesson-meta');
+  if (!selected) {
+    meta.textContent = '—';
+    state.textContent = 'IDLE';
+    state.className = 'pane-state';
+    return;
+  }
+  meta.textContent = `${selected.minutes} min`;
+  state.textContent = result?.passed ? 'DONE' : checking ? 'CHECK' : 'ACTIVE';
+  state.className = `pane-state ${result?.passed ? 'done' : checking ? 'busy' : ''}`;
+}
+
 function updateButtons() {
   const checkButton = $<HTMLButtonElement>('#check');
   checkButton.disabled = busy || checking || !connected || !selected;
-  checkButton.innerHTML = checking ? '<span class="spinner"></span> 检查中…' : `检查结果 ${icon('arrow')}`;
+  checkButton.innerHTML = checking ? '<span class="spinner"></span> 检查中…' : `检查结果 <span class="check-shortcut">${/Mac/.test(navigator.platform) ? '⌘' : 'Ctrl'} ↵</span>`;
   $<HTMLButtonElement>('#reset').disabled = busy || checking || !selected;
+  $<HTMLButtonElement>('#skip').disabled = busy || checking || !selected;
   $<HTMLButtonElement>('#hint').disabled = busy || !selected;
   document.querySelectorAll<HTMLButtonElement>('[data-open-generator], [data-topic], #change-challenge, #another').forEach((button) => { button.disabled = busy || checking || Boolean(button.dataset.topic && !generator.topics.find((topic) => topic.id === button.dataset.topic)?.available); });
 }
@@ -190,12 +434,15 @@ function updateButtons() {
 function connectionState(state: 'ready' | 'busy' | 'error', text: string) {
   $('#connection-dot').className = state;
   $('#connection-label').textContent = text;
+  $('#header-connection-dot').className = state;
+  $('#header-connection-label').textContent = state === 'ready' ? '环境已连接' : text;
+  $('#header-connection').title = text;
 }
 
 function overlay(title: string, message: string, action: boolean | 'generate' = false) {
   const target = $('#terminal-overlay');
   target.hidden = false;
-  target.innerHTML = `<div class="overlay-symbol">${icon(action ? 'terminal' : 'reset', action ? '' : 'spin')}</div><h3>${escape(title)}</h3><p>${escape(message)}</p>${action === 'generate' ? '<button class="primary-button" id="choose-scenario">选择开发场景</button>' : action ? '<button class="primary-button" id="retry">重新连接</button>' : '<span class="overlay-note">马上就好，请稍候。</span>'}`;
+  target.innerHTML = `<div class="overlay-symbol">${icon(action ? 'terminal' : 'reset', action ? '' : 'spin')}</div><span class="overlay-eyebrow">${action === 'generate' ? 'SESSION' : action ? 'CONNECTION' : 'WORKSPACE'}</span><h3>${escape(title)}</h3><p>${escape(message)}</p>${action === 'generate' ? '<button class="primary-button" id="choose-scenario">选择开发场景</button>' : action ? '<button class="primary-button" id="retry">重新连接</button>' : '<span class="overlay-note">马上就好，请稍候。</span>'}`;
   document.querySelector('#retry')?.addEventListener('click', () => void retry());
   document.querySelector('#choose-scenario')?.addEventListener('click', showGenerator);
 }
@@ -278,11 +525,12 @@ async function check() {
     if (result.passed) {
       completed.add(selected.id);
       try { localStorage.setItem('shell-lab-progress-v1', JSON.stringify([...completed])); } catch { /* Progress still works for this page. */ }
+      saveHistory(selected);
       renderSidebar();
     }
     renderLesson();
   } catch (error) { toast(errorMessage(error)); }
-  finally { checking = false; updateButtons(); }
+  finally { checking = false; updateLessonPane(); updateButtons(); }
 }
 
 function renderEnvironment() {
@@ -293,25 +541,69 @@ function renderEnvironment() {
 
 function showGenerator() {
   if (busy || checking) return;
+  setDrawer(false, false);
   if (!generator.aiConfigured && generationPreferences.source === 'ai') generationPreferences.source = 'rules';
   const preferences = generationPreferences;
-  showDialog(`<div class="dialog-eyebrow">BACKEND DEVELOPMENT LAB</div><h2 id="dialog-title">生成你的开发实战</h2><p>选择出题范围与难度。每道新题都会创建数据，并在独立工作区完成参考解和判题验证。</p>
+  const groups = allGroups();
+  const topicOption = (topic: ScenarioTopic) => {
+    const checked = preferences.topics.includes(topic.id);
+    const reason = topic.unavailableReason ?? '环境未就绪';
+    return `<label class="topic-option ${topic.available ? '' : 'unavailable'}" data-topic-option="${topic.id}"><input type="checkbox" name="topic" value="${topic.id}" ${checked ? 'checked' : ''} ${topic.available ? '' : 'disabled'}><span><strong>${escape(topic.name)}</strong><small>${escape(topic.available ? topic.description : reason)}</small></span></label>`;
+  };
+  showDialog(`<div class="dialog-eyebrow">GENERATOR / 出题</div><h2 id="dialog-title">生成你的开发实战</h2><p>选择出题范围与难度。每道新题都会创建数据，并在独立工作区完成参考解和判题验证。</p>
     <form id="generator-form">
-      <div class="generation-fields"><label>练习难度<select name="difficulty"><option value="basic" ${preferences.difficulty === 'basic' ? 'selected' : ''}>基础专项 · 1 个场景</option><option value="intermediate" ${preferences.difficulty === 'intermediate' ? 'selected' : ''}>组合实战 · 最多 2 个场景</option><option value="advanced" ${preferences.difficulty === 'advanced' ? 'selected' : ''}>综合挑战 · 最多 3 个场景</option></select></label>
-      <label>出题方式<select name="source" id="generation-source"><option value="rules" ${preferences.source === 'rules' ? 'selected' : ''}>本地动态出题 · 无需模型</option><option value="ai" ${!generator.aiConfigured ? 'disabled' : ''} ${preferences.source === 'ai' && generator.aiConfigured ? 'selected' : ''}>AI 场景规划${generator.aiConfigured ? '' : ' · 尚未配置'}</option></select></label></div>
-      <div class="generation-scope"><strong>想练哪些场景？</strong><span>可多选；不选则随机组合全部可用场景。</span></div>
-      <div class="topic-grid">${generator.topics.map((topic) => `<label class="topic-option ${topic.available ? '' : 'unavailable'}"><input type="checkbox" name="topic" value="${topic.id}" ${preferences.topics.includes(topic.id) ? 'checked' : ''} ${topic.available ? '' : 'disabled'}><span><strong>${escape(topic.name)}</strong><small>${escape(topic.available ? topic.description : topic.unavailableReason ?? '环境尚未就绪')}</small></span></label>`).join('')}</div>
-      <label class="generation-focus" id="generation-focus" ${preferences.source !== 'ai' ? 'hidden' : ''}>希望练习的工作情境<textarea name="focus" maxlength="500" placeholder="例如：上线后接口变慢，想练日志排查和配置回滚。">${escape(preferences.focus ?? '')}</textarea><small>偏好影响场景选择与背景，具体目标由已验证的生成器给出。</small></label>
-      ${!generator.aiConfigured ? '<p class="generation-note">本地模式会随机生成数据、筛选条件和任务组合。接入模型后可启用 AI 场景规划，配置方法见 README。</p>' : ''}
-      <p class="generation-note">生成成功后会替换当前环境；生成失败保留当前练习。重置恢复同一道题，“换一道题”才会重新出题。</p>
+      <div class="generator-scroll">
+        <section class="generator-section">
+          <div class="section-label">01 / 难度与来源</div>
+          <div class="generation-fields"><label>练习难度<select name="difficulty"><option value="basic" ${preferences.difficulty === 'basic' ? 'selected' : ''}>基础专项 · 1 个场景</option><option value="intermediate" ${preferences.difficulty === 'intermediate' ? 'selected' : ''}>组合实战 · 最多 2 个场景</option><option value="advanced" ${preferences.difficulty === 'advanced' ? 'selected' : ''}>综合挑战 · 最多 3 个场景</option></select></label>
+          <label>出题方式<select name="source" id="generation-source"><option value="rules" ${preferences.source === 'rules' ? 'selected' : ''}>本地动态出题 · 无需模型</option><option value="ai" ${!generator.aiConfigured ? 'disabled' : ''} ${preferences.source === 'ai' && generator.aiConfigured ? 'selected' : ''}>AI 场景规划${generator.aiConfigured ? '' : ' · 尚未配置'}</option></select></label></div>
+        </section>
+        <section class="generator-section">
+          <div class="section-label">02 / 场景范围</div>
+          <div class="generation-scope"><strong>想练哪些场景？</strong><span>可多选；不选则随机组合全部可用场景。</span></div>
+          <div class="generator-filter-row"><input id="generator-filter" type="search" placeholder="筛选可选场景" aria-label="筛选可选场景" autocomplete="off" spellcheck="false"><span id="generator-selected" aria-live="polite">已选 0</span></div>
+          ${groups.map((group) => {
+            const topics = generator.topics.filter((topic) => groupOf(topic) === group.id);
+            if (!topics.length) return '';
+            return `<fieldset class="topic-group" data-group="${group.id}"><legend>${escape(group.name)}<span class="topic-group-count">${topics.length}</span></legend><div class="topic-grid">${topics.map(topicOption).join('')}</div></fieldset>`;
+          }).join('')}
+        </section>
+        <section class="generator-section">
+          <div class="section-label">03 / 情境偏好</div>
+          <label class="generation-focus" id="generation-focus" ${preferences.source !== 'ai' ? 'hidden' : ''}>希望练习的工作情境<textarea name="focus" maxlength="500" placeholder="例如：上线后接口变慢，想练日志排查和配置回滚。">${escape(preferences.focus ?? '')}</textarea><small>偏好影响场景选择与背景，具体目标由已验证的生成器给出。</small></label>
+          ${!generator.aiConfigured ? '<p class="generation-note">本地模式会随机生成数据、筛选条件和任务组合。接入模型后可启用 AI 场景规划，配置方法见 README。</p>' : ''}
+          <p class="generation-note">生成成功后会替换当前环境；生成失败保留当前练习。重置恢复同一道题，“换一道题”才会重新出题。</p>
+        </section>
+      </div>
       <div class="dialog-actions"><button type="button" class="secondary-button" id="cancel-generation">返回练习</button><button type="submit" class="primary-button" ${generator.topics.some((topic) => topic.available) ? '' : 'disabled'}>${icon('spark')} 生成并开始</button></div>
-    </form>`);
+    </form>`, 'generator');
+  const form = $<HTMLFormElement>('#generator-form');
+  const updateSelected = () => {
+    const count = form.querySelectorAll<HTMLInputElement>('input[name="topic"]:checked').length;
+    $('#generator-selected').textContent = `已选 ${count}`;
+  };
+  updateSelected();
+  form.addEventListener('change', updateSelected);
+  $<HTMLInputElement>('#generator-filter').addEventListener('input', (event) => {
+    const query = (event.target as HTMLInputElement).value.trim().toLowerCase();
+    const topics = topicMap();
+    form.querySelectorAll<HTMLElement>('.topic-option').forEach((option) => {
+      const topic = topics.get(option.dataset.topicOption!);
+      option.hidden = Boolean(query) && !(topic && topicMatches(topic, query));
+    });
+    form.querySelectorAll<HTMLElement>('.topic-group').forEach((fieldset) => {
+      fieldset.hidden = [...fieldset.querySelectorAll<HTMLElement>('.topic-option')].every((option) => option.hidden);
+    });
+  });
+  $('#generator-filter').addEventListener('keydown', (event) => {
+    if ((event as KeyboardEvent).key === 'Enter') event.preventDefault();
+  });
   $('#cancel-generation').addEventListener('click', closeDialog);
   $('#generation-source').addEventListener('change', () => { $('#generation-focus').hidden = $<HTMLSelectElement>('#generation-source').value !== 'ai'; });
-  $('#generator-form').addEventListener('submit', (event) => {
+  form.addEventListener('submit', (event) => {
     event.preventDefault();
-    const form = new FormData($<HTMLFormElement>('#generator-form'));
-    generationPreferences = { topics: form.getAll('topic') as string[], difficulty: form.get('difficulty') as Difficulty, source: form.get('source') as GenerationOptions['source'], focus: form.get('focus') as string };
+    const data = new FormData(form);
+    generationPreferences = { topics: data.getAll('topic') as string[], difficulty: data.get('difficulty') as Difficulty, source: data.get('source') as GenerationOptions['source'], focus: data.get('focus') as string };
     closeDialog();
     void generateSession(generationPreferences);
   });
@@ -320,7 +612,7 @@ function showGenerator() {
 async function generateSession(options: GenerationOptions) {
   if (busy || checking) return;
   busy = true; updateButtons();
-  $('#sidebar').classList.remove('is-open');
+  setDrawer(false, false);
   overlay('正在生成并试做新题', options.source === 'ai' ? 'AI 正在规划场景，随后会创建数据并验证参考解与判题。' : '正在组合开发场景、生成初始数据，并在独立工作区验证可解性。');
   try {
     const next = await api<SessionInfo>('generate', options);
@@ -333,17 +625,91 @@ async function generateSession(options: GenerationOptions) {
   } finally { busy = false; updateButtons(); }
 }
 
-function showDialog(content: string) {
+function openPalette() {
+  if (anyDialogOpen()) return;
+  paletteReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  setDrawer(false, false);
+  const palette = $<HTMLDialogElement>('#palette');
+  const input = $<HTMLInputElement>('#palette-input');
+  input.value = ''; paletteIndex = 0;
+  if (!palette.open) palette.showModal();
+  renderPalette();
+  input.focus();
+}
+
+function closePalette() {
+  const palette = $<HTMLDialogElement>('#palette');
+  if (palette.open) palette.close();
+}
+
+function paletteActions(): PaletteItem[] {
+  const actions: PaletteItem[] = [
+    { id: 'generate', label: '生成开发实战', hint: 'command', run: () => { closePalette(); showGenerator(); } },
+    { id: 'reference', label: '命令速查', hint: 'command', run: () => { closePalette(); showReference(); } },
+    { id: 'guide', label: '练习指南', hint: 'command', run: () => { closePalette(); showGuide(); } },
+  ];
+  if (selected) actions.push({ id: 'reset', label: '重置环境', hint: 'command', run: () => { closePalette(); requestReset(); } });
+  return actions;
+}
+
+function renderPalette() {
+  const input = $<HTMLInputElement>('#palette-input');
+  const query = input.value.trim().toLowerCase();
+  const actions = paletteActions().filter((item) => !query || item.label.toLowerCase().includes(query));
+  const topics = generator.topics.filter((topic) => topic.available && (!query || topicMatches(topic, query))).map((topic) => ({
+    id: `topic-${topic.id}`, label: topic.name, hint: groupLabel(groupOf(topic)),
+    run: () => { closePalette(); selectTopic(topic.id); },
+  }));
+  paletteItems = [...actions, ...topics];
+  if (paletteIndex >= paletteItems.length) paletteIndex = Math.max(0, paletteItems.length - 1);
+  $('#palette-list').innerHTML = paletteItems.length
+    ? paletteItems.map((item, index) => `<li class="palette-item" id="palette-option-${index}" role="option" aria-selected="${index === paletteIndex}" data-palette-index="${index}"><span class="palette-item-label">${escape(item.label)}</span><span class="palette-item-hint">${escape(item.hint)}</span></li>`).join('')
+    : '<li class="palette-empty">没有匹配的命令或场景。</li>';
+  input.setAttribute('aria-activedescendant', paletteItems.length ? `palette-option-${paletteIndex}` : '');
+  document.querySelector(`#palette-option-${paletteIndex}`)?.scrollIntoView({ block: 'nearest' });
+}
+
+function onPaletteKeydown(event: KeyboardEvent) {
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    if (!paletteItems.length) return;
+    paletteIndex = (paletteIndex + (event.key === 'ArrowDown' ? 1 : -1) + paletteItems.length) % paletteItems.length;
+    renderPalette();
+  } else if (event.key === 'Enter') {
+    event.preventDefault();
+    activatePaletteItem(paletteIndex);
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    closePalette();
+  }
+}
+
+function activatePaletteItem(index: number) {
+  paletteItems[index]?.run();
+}
+
+function showDialog(content: string, variant = 'default') {
+  dialogReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const dialog = $<HTMLDialogElement>('#dialog');
+  dialog.dataset.variant = variant;
   $('#dialog-content').innerHTML = `<button class="icon-button dialog-close" id="dialog-close" aria-label="关闭弹窗">${icon('close')}</button>${content}`;
-  if (!$<HTMLDialogElement>('#dialog').open) $<HTMLDialogElement>('#dialog').showModal();
+  if (!dialog.open) dialog.showModal();
   $('#dialog-close').addEventListener('click', closeDialog);
 }
+
 function closeDialog() { $<HTMLDialogElement>('#dialog').close(); }
+
+function restoreDialogFocus() {
+  if (dialogReturnFocus?.isConnected) dialogReturnFocus.focus();
+  dialogReturnFocus = null;
+}
+
 function confirmAction(title: string, description: string, label: string, action: () => void) {
-  showDialog(`<div class="dialog-eyebrow">工作区</div><h2 id="dialog-title">${escape(title)}</h2><p>${escape(description)}</p><div class="dialog-actions"><button class="secondary-button" id="cancel">继续当前练习</button><button class="primary-button" id="confirm">${escape(label)}</button></div>`);
+  showDialog(`<div class="dialog-eyebrow">WORKSPACE / 工作区</div><h2 id="dialog-title">${escape(title)}</h2><p>${escape(description)}</p><div class="dialog-actions"><button class="secondary-button" id="cancel">继续当前练习</button><button class="primary-button" id="confirm">${escape(label)}</button></div>`, 'confirm');
   $('#cancel').addEventListener('click', closeDialog);
   $('#confirm').addEventListener('click', () => { closeDialog(); action(); });
 }
+
 function showReference() {
   const commands = [
     ['pwd / ls -la', '查看当前位置 / 查看文件（包括隐藏文件）'], ['cd 路径 / cd ..', '进入目录 / 返回上级目录'],
@@ -364,19 +730,21 @@ function showReference() {
     ['flock -n -E 75 9', '获取文件描述符 9 的锁，冲突立即返回 75'],
     ['chmod +x script.sh', '给脚本添加执行权限'], ['printf \'%s\\n\' "$name"', '保留变量内容并输出一行'],
   ];
-  showDialog(`<div class="dialog-eyebrow">QUICK REFERENCE</div><h2 id="dialog-title">手边的命令速查</h2><p>记不住很正常。查一查，再动手试一试。</p><div class="reference-list">${commands.map(([command, text]) => `<div><code>${escape(command)}</code><span>${escape(text)}</span></div>`).join('')}</div><p class="dialog-footnote">快捷键：Tab 补全 · ↑ / ↓ 历史命令 · Ctrl+C 中断 · Ctrl+D 结束输入</p>`);
+  showDialog(`<div class="dialog-eyebrow">REFERENCE / 速查</div><h2 id="dialog-title">手边的命令速查</h2><p>记不住很正常。查一查，再动手试一试。</p><div class="reference-list">${commands.map(([command, text]) => `<div><code>${escape(command)}</code><span>${escape(text)}</span></div>`).join('')}</div><p class="dialog-footnote">快捷键：Tab 补全 · ↑ / ↓ 历史命令 · Ctrl+C 中断 · Ctrl+D 结束输入</p>`, 'reference');
 }
+
 function showGuide() {
-  showDialog(`<div class="dialog-eyebrow">GETTING STARTED</div><h2 id="dialog-title">从第一条命令开始</h2><ol class="guide-steps"><li><strong>选择开发场景</strong><p>点击“生成开发实战”，选择场景与难度。新题验证通过后，右侧终端会连接真实 Bash。</p></li><li><strong>输入，再按 Enter</strong><p>文件、当前目录和变量会在会话中保留。终端报错也是真实的 Linux 反馈。</p></li><li><strong>检查实际结果</strong><p>点击“检查结果”查看每个目标的状态。没有唯一写法，结果正确就能通过。脚本题会运行你的脚本来检查行为。</p></li><li><strong>卡住时，试试提示</strong><p>提示里有思路和可复制的参考写法。“重置环境”可以恢复初始文件，“换一道题”会生成新的任务和环境。</p></li></ol><p class="dialog-footnote">连续 30 分钟没有操作，环境会被回收。完成进度仅保存在当前浏览器。</p>`);
+  showDialog(`<div class="dialog-eyebrow">GUIDE / 指南</div><h2 id="dialog-title">从第一条命令开始</h2><ol class="guide-steps"><li><span class="step-index">01</span><div><strong>选择开发场景</strong><p>点击“生成开发实战”，选择场景与难度。新题验证通过后，右侧终端会连接真实 Bash。</p></div></li><li><span class="step-index">02</span><div><strong>输入，再按 Enter</strong><p>文件、当前目录和变量会在会话中保留。终端报错也是真实的 Linux 反馈。</p></div></li><li><span class="step-index">03</span><div><strong>检查实际结果</strong><p>点击“检查结果”查看每个目标的状态。没有唯一写法，结果正确就能通过。脚本题会运行你的脚本来检查行为。</p></div></li><li><span class="step-index">04</span><div><strong>卡住时，试试提示</strong><p>提示里有思路和可复制的参考写法。“重置环境”可以恢复初始文件，“换一道题”会生成新的任务和环境。</p></div></li></ol><p class="dialog-footnote">连续 30 分钟没有操作，环境会被回收。完成进度仅保存在当前浏览器。</p>`, 'guide');
 }
+
 let toastTimer: ReturnType<typeof setTimeout>;
 function toast(message: string) {
   clearTimeout(toastTimer); $('#toast').textContent = message; $('#toast').hidden = false;
   toastTimer = setTimeout(() => { $('#toast').hidden = true; }, 4000);
 }
 async function copy(text: string) {
-  try { await navigator.clipboard.writeText(text); toast('已复制，可以粘贴到终端中运行。'); }
-  catch { toast('浏览器无法访问剪贴板，请选中文本手动复制。'); }
+  try { await writeClipboard(text); toast('已复制，可以粘贴到终端中运行。'); }
+  catch { toast('当前环境无法访问剪贴板，请选中文本手动复制。'); }
 }
 function errorMessage(error: unknown) { return error instanceof Error ? error.message : '连接失败，请重试。'; }
 
@@ -392,7 +760,7 @@ async function init() {
     else if (health.ready) showWelcome();
     else { connectionState('error', '环境未就绪'); overlay('还差一个 Linux 环境', health.message, true); }
   } catch {
-    $('#app').innerHTML = `<main class="startup-error"><span class="brand-symbol">${icon('terminal')}</span><h1>ShellLab 服务尚未启动</h1><p>请在项目目录运行 <code>npm run dev</code>，然后重新加载页面。</p><button class="primary-button" id="reload">重新加载</button></main>`;
+    $('#app').innerHTML = `<main class="startup-error"><span class="brand-prompt">❯_</span><h1>ShellLab 服务尚未启动</h1><p>请在项目目录运行 <code>npm run dev</code>，然后重新加载页面。</p><button class="primary-button" id="reload">重新加载</button></main>`;
     $('#reload').addEventListener('click', () => location.reload());
   }
 }

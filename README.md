@@ -6,7 +6,7 @@
 
 ## 后端开发动态实战
 
-首页直接显示开发场景。点击左侧具体场景可以开始专项练习，或点击 **“生成开发实战”**，选择出题范围和难度，再点击 **“生成并开始”**。基础专项生成 1 个场景，组合实战最多 2 个，综合挑战最多 3 个；所选场景少于上限时使用实际可用数量。不选范围时从全部可用场景中随机组合。选择并生成前不会自动创建练习会话。
+点击左侧 **“场景库”** 展开开发场景。点击具体场景可以开始专项练习，或点击 **“生成开发实战”**，选择出题范围和难度，再点击 **“生成并开始”**。基础专项生成 1 个场景，组合实战最多 2 个，综合挑战最多 3 个；所选场景少于上限时使用实际可用数量。不选范围时从全部可用场景中随机组合。选择并生成前不会自动创建练习会话。
 
 | 场景 | 常见任务 |
 | --- | --- |
@@ -37,6 +37,8 @@
 | SSH/SCP 远程发布 | 上传产物、远程解压、切换版本、健康检查、下载日志 |
 
 **“重置环境”恢复同一道题的初始状态，“换一道题”重新生成数据与任务。** 刷新页面会恢复当前题目和 Shell 会话；生成失败保留原环境。每次生成前会检测所需工具，缺少工具的场景会在选择器里显示原因。本机模式不会擅自安装 Git、Python、curl 等系统工具。
+
+左侧场景按“排查与诊断 / 文件与数据 / 发布与工程 / SSH 与远程”分组，可折叠；筛选框支持按名称、描述、概念和工具搜索，按 `/` 可快速聚焦。按 `⌘K`（Windows/Linux 为 `Ctrl K`）打开命令面板，可直接跳转场景或执行“生成开发实战 / 命令速查 / 重置环境”等操作。场景库在桌面和移动端均以抽屉打开，支持遮罩和 Esc 关闭。练习区支持终端展开 / 收起、`Ctrl+Enter`（macOS 为 `⌘Enter`）检查结果；左侧“历史”查看本机完成记录，“设置”可调整并保存终端字号。
 
 出题不是只替换文件名：日志题会改变查询目标和聚合条件，清理题会改变时间/大小约束，数据题会在汇总与去重之间变化，不同场景还能组合成一次值班演练。不过它仍以受验证的能力目录为边界，并不承诺无限创造新的题型。
 
@@ -125,6 +127,28 @@ SHELL_LAB_RUNTIME=local npm run dev
 
 也可以复制 `.env.example` 为 `.env`，修改配置后启动。`dev` 和 `start` 都会读取 `.env`，已设置的环境变量优先。
 
+## Electron 桌面窗口
+
+安装依赖后，可在带图形桌面的 Linux 中启动桌面版（默认使用 Docker 练习环境）：
+
+```bash
+npm ci
+npm run sandbox:build
+npm run desktop
+```
+
+在可信的单用户开发机使用现有本机 Bash 环境：
+
+```bash
+SHELL_LAB_RUNTIME=local npm run desktop
+```
+
+启动器先构建前后端，再使用系统 Node.js 启动本机后端，等待服务就绪后打开 Electron；关闭窗口时清理服务、PTY 和练习环境。后端单独运行，保持现有 `node-pty` 的 Node ABI，无需为 Electron 重编译。桌面版默认使用 `127.0.0.1:3002`，与 Web 版端口分开；可用 `SHELL_LAB_DESKTOP_PORT` 修改。固定端口使完成记录和字号设置在桌面版重启后保留。桌面版与浏览器的历史记录各自保存。
+
+窗口提供可拖动标题栏、最小化、最大化 / 还原和关闭。主进程、preload 和渲染层分离，渲染器启用 sandbox 与 context isolation，仅通过白名单 IPC 控制窗口和写入剪贴板（渲染层仍拒绝读取剪贴板等权限请求）。当前提供从源码启动，尚未制作安装包；练习后端沿用 Linux / Docker 的要求。
+
+首次启动时 Electron 会下载对应平台的二进制文件，需要联网。桌面集成验证可以执行 `npm run test:desktop`（需要可用的图形显示环境；无桌面环境时使用 `xvfb-run -a npm run test:desktop`）。
+
 ## 构建后运行
 
 ```bash
@@ -169,6 +193,9 @@ npm run test:docker
 # 浏览器中的真实终端操作、提示、判题、重置和手机布局
 npx playwright install chromium --only-shell
 npm run test:browser
+
+# Electron 窗口、主进程 IPC、剪贴板与启动器清理
+npm run test:desktop
 ```
 
 `npm test` 显式使用临时目录中的本机 Bash 运行固定测试命令；它不会自动启用服务器的本机模式。缺少 OpenSSH 服务端时，SSH 测试会明确跳过；先执行 `setup-ssh.sh` 可以运行完整验证。Docker 测试默认跳过，只有 `test:docker` 才会运行。浏览器测试需要先完成构建并准备 SSH 工具，会自动在本机 Bash 模式启动测试服务，运行前请关闭占用 3001 端口的开发服务。Linux 缺少浏览器依赖时可运行 `npx playwright install --with-deps chromium --only-shell`。
@@ -178,6 +205,9 @@ GitHub Actions 配置包含构建、Bash 集成测试、真实 Docker 测试和�
 ## 代码结构
 
 ```text
+electron/               Electron 主进程、受限 preload 和独立后端入口
+scripts/desktop.mjs     桌面启动与进程清理
+src/ui/                 界面壳层、图标和桌面桥接
 src/                    TypeScript 页面、xterm.js 终端与样式
 shared/types.ts         前后端数据类型
 server/app.ts           HTTP、Cookie 会话和 WebSocket 接口

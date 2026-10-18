@@ -37,6 +37,7 @@ async function command(page: Page, text: string) {
 }
 
 async function begin(page: Page, topics = ['config'], difficulty = 'basic'): Promise<SessionInfo> {
+  await page.getByRole('button', { name: '打开练习列表' }).click();
   await page.getByRole('button', { name: /生成开发实战/ }).click();
   await page.getByLabel('练习难度').selectOption(difficulty);
   for (const topic of topics) await page.locator(`input[name="topic"][value="${topic}"]`).check();
@@ -64,6 +65,7 @@ test('homepage offers only dynamic scenarios and waits for the user to choose', 
   await expect(page.getByRole('button', { name: '给我一点提示' })).toBeDisabled();
   expect(generations).toBe(0);
   expect((await (await page.request.get('/api/bootstrap')).json()).session).toBeNull();
+  await page.getByRole('button', { name: '打开练习列表' }).click();
   await page.getByRole('button', { name: '应用日志排查', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.locator('input[name="topic"][value="logs"]')).toBeChecked();
@@ -83,6 +85,7 @@ test('command reference and scene navigation work on a narrow screen', async ({ 
   await page.getByRole('button', { name: '打开练习列表' }).click();
   await expect(page.getByRole('navigation', { name: '开发场景' })).toBeVisible();
   await page.getByRole('button', { name: '打开练习列表' }).click();
+  await expect(page.locator('#sidebar')).toBeHidden();
   await page.screenshot({ path: 'test-results/mobile.png', fullPage: true });
 });
 
@@ -140,6 +143,7 @@ test('failed generation preserves the current question and Bash session', async 
   await page.goto('/');
   const current = await begin(page);
   await page.route('**/api/generate', (route) => route.fulfill({ status: 409, json: { error: '出题服务暂时不可用，当前练习已保留。' } }));
+  await page.getByRole('button', { name: '打开练习列表' }).click();
   await page.getByRole('button', { name: /生成开发实战/ }).click();
   await page.getByRole('button', { name: '生成并开始' }).click();
   await expect(page.locator('#toast')).toContainText('当前练习已保留');

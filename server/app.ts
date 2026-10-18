@@ -88,7 +88,9 @@ export function createApp(runtime = new Runtime()) {
 
   app.use('/api', (_req, res) => { res.status(404).json({ error: '接口不存在。' }); });
   const dist = resolve(process.cwd(), 'dist');
-  app.use(express.static(dist));
+  app.use(express.static(dist, {
+    setHeaders: (res) => res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://127.0.0.1:*; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"),
+  }));
   app.get('/', (_req, res) => { res.sendFile(resolve(dist, 'index.html')); });
   app.use((error: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     res.status(400).json({ error: error instanceof SyntaxError ? '请求格式不正确。' : '请求失败，请重试。' });

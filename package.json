@@ -14,7 +14,9 @@
     "test": "node --import tsx --test --test-isolation=none tests/*.test.ts",
     "test:docker": "SHELL_LAB_TEST_DOCKER=1 node --import tsx --test --test-isolation=none tests/docker.test.ts",
     "test:browser": "playwright test",
-    "sandbox:build": "docker build -t shell-lab-sandbox:1 ./sandbox"
+    "test:desktop": "npm run build && playwright test --config=playwright.desktop.config.ts",
+    "sandbox:build": "docker build -t shell-lab-sandbox:1 ./sandbox",
+    "desktop": "npm run build && node scripts/desktop.mjs"
   },
   "dependencies": {
     "@xterm/addon-fit": "0.11.0",
@@ -29,6 +31,7 @@
     "@types/node": "^24.0.0",
     "@types/ws": "^8.18.1",
     "concurrently": "^9.2.1",
+    "electron": "^44.9.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vite": "^7.1.0"

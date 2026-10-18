@@ -20,12 +20,14 @@ export interface Lesson {
   };
 }
 export type Difficulty = 'basic' | 'intermediate' | 'advanced';
+export type ScenarioGroupId = 'diagnose' | 'files' | 'release' | 'remote';
 export interface ScenarioTopic {
   id: string;
   name: string;
   description: string;
   concepts: string[];
   tools: string[];
+  group: ScenarioGroupId;
   available: boolean;
   unavailableReason?: string;
 }
