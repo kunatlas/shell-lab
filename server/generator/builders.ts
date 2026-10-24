@@ -2,6 +2,7 @@ import type { FixtureSpec } from '../exercises.js';
 import { Random, equals, quote, write } from './random.js';
 import { remoteBuilders } from './remote-builders.js';
 import { operationsBuilders } from './operations-builders.js';
+import { everydayBuilders } from './everyday-builders.js';
 
 interface Goal { text: string; check: string }
 export interface Task {
@@ -21,6 +22,7 @@ const jsonCheck = (path: string, expected: unknown) => `python3 -c ${quote(`impo
 export const builders: Record<string, Builder> = {
   ...remoteBuilders,
   ...operationsBuilders,
+  ...everydayBuilders,
   logs(random, service) {
     const level = random.pick(['ERROR', 'WARN']);
     const trace = `req-${random.integer(1000, 9999)}`;

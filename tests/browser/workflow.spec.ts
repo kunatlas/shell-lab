@@ -60,7 +60,7 @@ test('homepage offers only dynamic scenarios and waits for the user to choose', 
   await expect(page.getByText('入门练习', { exact: true })).toHaveCount(0);
   await expect(page.getByText('入门进度', { exact: true })).toHaveCount(0);
   await expect(page.locator('#progress-number')).toHaveText('0 题');
-  await expect(page.locator('[data-topic]')).toHaveCount(25);
+  await expect(page.locator('[data-topic]')).toHaveCount(30);
   await expect(page.getByRole('button', { name: '检查结果' })).toBeDisabled();
   await expect(page.getByRole('button', { name: '给我一点提示' })).toBeDisabled();
   expect(generations).toBe(0);
@@ -159,7 +159,7 @@ test('scenario selector fits a narrow screen and exposes daily development tasks
   await expect(page.locator('#connection-label')).toHaveText('尚未开始练习');
   await page.getByRole('button', { name: '打开练习列表' }).click();
   await page.getByRole('button', { name: /生成开发实战/ }).click();
-  await expect(page.locator('.topic-option')).toHaveCount(25);
+  await expect(page.locator('.topic-option')).toHaveCount(30);
   await expect(page.locator('#generator-form')).toContainText('HTTP 健康检查');
   await expect(page.locator('#generator-form')).toContainText('Git 日常开发');
   await expect(page.locator('#generator-form')).toContainText('进程排查与停止');

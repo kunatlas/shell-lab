@@ -74,7 +74,7 @@ test('HTTP and worker fixtures are owned by the workspace and removed on destroy
 test('tool availability and rules generator work without AI credentials', async () => {
   const runtime = new Runtime({ mode: 'local' });
   const info = await generatorInfo(runtime);
-  assert.equal(info.topics.length, 25);
+  assert.equal(info.topics.length, 30);
   assert.ok(info.topics.find((topic) => topic.id === 'logs')?.available);
   const generated = await generateExercise(runtime, options(['logs', 'access'], 'intermediate'));
   assert.equal(generated.lesson.generated?.source, 'rules');

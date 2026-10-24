@@ -29,7 +29,7 @@ test('HTTP + WebSocket workflow: bootstrap, authenticate, solve, check, restore,
     assert.equal(Object.hasOwn(data, 'lessons'), false);
     assert.equal(data.health.mode, 'local');
     assert.equal(data.session, null);
-    assert.equal(data.generator.topics.length, 25);
+    assert.equal(data.generator.topics.length, 30);
     const post = (path: string, body: object, auth = true) => fetch(`${base}/api/${path}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', ...(auth ? { Cookie: cookie } : {}) }, body: JSON.stringify(body),
     });

@@ -26,6 +26,11 @@ export const catalog: Omit<ScenarioTopic, 'available'>[] = [
   { id: 'scp', group: 'remote', name: 'SCP 上传与下载', description: '实际传输部署文件和远端日志，正确处理方向、端口与空格。', concepts: ['scp -P', '-i', '上传', '下载'], tools: ['ssh', 'scp', 'ssh-keygen', 'sshd', 'sftp-server', 'python3', 'cmp'] },
   { id: 'scp-tree', group: 'remote', name: 'SCP 目录与文件属性', description: '递归传输目录、隐藏文件和带空格文件，保留权限和修改时间。', concepts: ['scp -r', 'scp -p', 'stat', '目录层级'], tools: ['ssh', 'scp', 'ssh-keygen', 'sshd', 'sftp-server', 'python3', 'cmp'] },
   { id: 'remote-deploy', group: 'remote', name: 'SSH/SCP 远程发布', description: '上传归档、远程解压切换版本、执行健康检查并取回日志。', concepts: ['ssh', 'scp', 'tar', '远程发布'], tools: ['ssh', 'scp', 'ssh-keygen', 'sshd', 'sftp-server', 'python3', 'tar', 'gzip', 'cmp'] },
+  { id: 'ps', group: 'diagnose', name: '进程清单', description: '用 ps aux 和 ps -ef 查看练习进程的用户、状态和父进程。', concepts: ['ps aux', 'ps -ef', 'PPID'], tools: ['ps', 'awk', 'python3'] },
+  { id: 'context', group: 'diagnose', name: '日志上下文筛选', description: '用 grep 保留匹配行的上下文，并分开保存未命中的行。', concepts: ['grep -n', 'grep -E', 'grep -A', 'grep -B', 'grep -v'], tools: ['grep', 'cmp'] },
+  { id: 'df', group: 'diagnose', name: '文件系统与目录占用', description: '用 df 查看文件系统容量，用 du 查看目录占用。', concepts: ['df -P', 'df -h', 'du -sk'], tools: ['df', 'du', 'awk', 'cmp'] },
+  { id: 'pipeline', group: 'files', name: '分流输出与批量搜索', description: '用 tee 和 head 保存清单，用 xargs -0 搜索带空格的文件名。', concepts: ['tee', 'head', 'xargs -0', 'find -print0'], tools: ['find', 'xargs', 'grep', 'tee', 'head', 'cmp'] },
+  { id: 'diff', group: 'files', name: '文件差异比较', description: '用 diff -u 和 diff -q 比较两份配置。', concepts: ['diff -u', 'diff -q', '退出码 1'], tools: ['diff', 'awk', 'cmp'] },
 ];
 
 export const topicIds = catalog.map((topic) => topic.id);

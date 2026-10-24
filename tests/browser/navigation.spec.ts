@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 
-test('sidebar groups all 25 scenarios and keeps every node when collapsed', async ({ page }) => {
+test('sidebar groups all 30 scenarios and keeps every node when collapsed', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: '打开练习列表' }).click();
-  await expect(page.locator('[data-topic]')).toHaveCount(25);
+  await expect(page.locator('[data-topic]')).toHaveCount(30);
   await expect(page.locator('.scenario-group')).toHaveCount(4);
 
   const counts = await page.locator('.scenario-group').evaluateAll((groups) => groups.map((group) => ({
@@ -11,8 +11,8 @@ test('sidebar groups all 25 scenarios and keeps every node when collapsed', asyn
     count: group.querySelectorAll('[data-topic]').length,
   })));
   expect(counts).toEqual([
-    { id: 'diagnose', count: 7 },
-    { id: 'files', count: 7 },
+    { id: 'diagnose', count: 10 },
+    { id: 'files', count: 9 },
     { id: 'release', count: 6 },
     { id: 'remote', count: 5 },
   ]);
@@ -25,7 +25,7 @@ test('sidebar groups all 25 scenarios and keeps every node when collapsed', asyn
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(page.locator('[data-topic="find"]')).toBeHidden();
-  await expect(page.locator('[data-topic]')).toHaveCount(25);
+  await expect(page.locator('[data-topic]')).toHaveCount(30);
 
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -38,8 +38,8 @@ test('scenario filter narrows groups without removing topic nodes', async ({ pag
   const filter = page.locator('#scenario-filter');
 
   await filter.fill('ssh');
-  await expect(page.locator('#scenario-count')).toHaveText('5 / 25');
-  await expect(page.locator('[data-topic]')).toHaveCount(25);
+  await expect(page.locator('#scenario-count')).toHaveText('5 / 30');
+  await expect(page.locator('[data-topic]')).toHaveCount(30);
   await expect(page.locator('[data-topic="ssh"]')).toBeVisible();
   await expect(page.locator('[data-topic="logs"]')).toBeHidden();
   await expect(page.locator('.scenario-group[data-group="diagnose"]')).toBeHidden();
@@ -47,15 +47,15 @@ test('scenario filter narrows groups without removing topic nodes', async ({ pag
   await page.screenshot({ path: 'test-results/navigation-filtered.png', fullPage: true });
 
   await filter.fill('jq');
-  await expect(page.locator('#scenario-count')).toHaveText('1 / 25');
+  await expect(page.locator('#scenario-count')).toHaveText('1 / 30');
   await expect(page.locator('[data-topic="json"]')).toBeVisible();
 
   await filter.fill('zzzz');
-  await expect(page.locator('#scenario-count')).toHaveText('0 / 25');
+  await expect(page.locator('#scenario-count')).toHaveText('0 / 30');
   await expect(page.locator('#scenario-empty')).toBeVisible();
 
   await filter.fill('');
-  await expect(page.locator('#scenario-count')).toHaveText('25');
+  await expect(page.locator('#scenario-count')).toHaveText('30');
   await expect(page.locator('[data-topic="logs"]')).toBeVisible();
   await expect(page.locator('#scenario-empty')).toBeHidden();
 });
@@ -69,7 +69,7 @@ test('mobile drawer opens, filters, and closes with Escape without horizontal ov
   await expect(page.locator('#sidebar')).toHaveClass(/is-open/);
   await expect(page.locator('#scenario-filter')).toBeVisible();
   await page.locator('#scenario-filter').fill('scp');
-  await expect(page.locator('#scenario-count')).toHaveText('3 / 25');
+  await expect(page.locator('#scenario-count')).toHaveText('3 / 30');
 
   await page.keyboard.press('Escape');
   await expect(page.locator('#sidebar')).not.toHaveClass(/is-open/);
@@ -158,14 +158,14 @@ test('generator groups all options and filtering keeps the DOM count stable', as
   await page.getByRole('button', { name: /生成开发实战/ }).click();
   await expect(page.locator('#dialog')).toBeVisible();
   await expect(page.locator('.topic-group')).toHaveCount(4);
-  await expect(page.locator('.topic-option')).toHaveCount(25);
+  await expect(page.locator('.topic-option')).toHaveCount(30);
 
   const counts = await page.locator('.topic-group').evaluateAll((groups) => groups.map((group) => group.querySelectorAll('.topic-option').length));
-  expect(counts).toEqual([7, 7, 6, 5]);
+  expect(counts).toEqual([10, 9, 6, 5]);
   await page.screenshot({ path: 'test-results/generator-grouped.png', fullPage: false });
 
   await page.locator('#generator-filter').fill('ssh');
-  await expect(page.locator('.topic-option')).toHaveCount(25);
+  await expect(page.locator('.topic-option')).toHaveCount(30);
   await expect(page.locator('.topic-option[data-topic-option="ssh"]')).toBeVisible();
   await expect(page.locator('.topic-option[data-topic-option="logs"]')).toBeHidden();
   await expect(page.locator('.topic-group[data-group="diagnose"]')).toBeHidden();
