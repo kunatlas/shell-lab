@@ -97,7 +97,8 @@ export class Runtime {
         '--label', 'shell-lab.managed=true', '--network', 'none',
         '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
         '--memory', '256m', '--memory-swap', '256m', '--cpus', '0.5', '--pids-limit', '64',
-        '--tmpfs', '/home/student:rw,nosuid,nodev,size=64m,uid=10001,gid=10001,mode=0700',
+        // Docker always prepends noexec. The workspace must stay executable so scripts such as health.sh can run; /tmp stays noexec.
+        '--tmpfs', '/home/student:rw,nosuid,nodev,exec,size=64m,uid=10001,gid=10001,mode=0700',
         '--tmpfs', '/tmp:rw,nosuid,nodev,noexec,size=32m',
         '--workdir', '/tmp', this.image,
       ], { timeout: 30_000 });
