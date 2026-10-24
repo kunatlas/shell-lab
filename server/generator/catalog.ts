@@ -1,0 +1,36 @@
+import type { ScenarioTopic } from '../../shared/types.js';
+
+export const catalog: Omit<ScenarioTopic, 'available'>[] = [
+  { id: 'logs', group: 'diagnose', name: '应用日志排查', description: '按服务、级别和请求筛选日志，保留排障证据。', concepts: ['grep', 'awk', '重定向'], tools: ['grep', 'awk', 'cmp'] },
+  { id: 'access', group: 'diagnose', name: '访问日志统计', description: '分析 HTTP 状态码、热门路径和慢请求。', concepts: ['awk', 'sort', 'uniq', '管道'], tools: ['awk', 'sort', 'uniq', 'cmp'] },
+  { id: 'find', group: 'files', name: '文件查找与清理', description: '按文件类型、修改时间和大小清理临时产物。', concepts: ['find', '-mtime', '-size', '-delete'], tools: ['find', 'touch', 'cmp'] },
+  { id: 'config', group: 'files', name: '环境配置修改', description: '更新部署配置，保留注释并备份原文件。', concepts: ['sed', 'cp', 'diff'], tools: ['sed', 'cp', 'cmp'] },
+  { id: 'archive', group: 'files', name: '备份与压缩', description: '打包应用数据、排除缓存，并验证可恢复性。', concepts: ['tar', 'gzip', '--exclude'], tools: ['tar', 'gzip', 'cmp'] },
+  { id: 'permissions', group: 'files', name: '权限与敏感文件', description: '修正配置文件、目录和脚本的权限。', concepts: ['chmod', 'stat', 'umask'], tools: ['chmod', 'stat', 'cmp'] },
+  { id: 'deploy', group: 'release', name: '版本发布与回滚', description: '切换软链接、保留旧版本并生成校验记录。', concepts: ['ln -s', 'readlink', 'sha256sum'], tools: ['ln', 'readlink', 'sha256sum', 'cmp'] },
+  { id: 'batch', group: 'files', name: '批量文件处理', description: '处理带空格的文件名，批量重命名与生成清单。', concepts: ['for', 'find -print0', '引号'], tools: ['find', 'sort', 'cmp'] },
+  { id: 'csv', group: 'files', name: '数据导出与汇总', description: '从 CSV 中筛选订单、汇总金额或生成用户清单。', concepts: ['awk', 'cut', 'sort', 'uniq'], tools: ['awk', 'sort', 'cmp'] },
+  { id: 'json', group: 'files', name: 'JSON 配置与接口数据', description: '筛选嵌套数据、提取实例与检查配置。', concepts: ['jq', 'python3', 'JSON'], tools: ['python3', 'cmp'] },
+  { id: 'git', group: 'release', name: 'Git 日常开发', description: '建立分支、提交指定修改，保护本地配置。', concepts: ['git status', 'git diff', 'git add', 'git commit'], tools: ['git', 'cmp'] },
+  { id: 'scripts', group: 'release', name: '健壮的运维脚本', description: '处理参数、退出码和带空格路径，编写可重复执行的脚本。', concepts: ['if', '$?', '参数校验', 'set -e'], tools: ['bash', 'cmp'] },
+  { id: 'http', group: 'diagnose', name: 'HTTP 健康检查', description: '对真实的本地接口发送请求，保存响应与状态码。', concepts: ['curl', 'HTTP', '状态码'], tools: ['python3', 'curl', 'cmp'] },
+  { id: 'process', group: 'diagnose', name: '进程排查与停止', description: '定位练习工作进程、记录信息并发送终止信号。', concepts: ['ps', 'pgrep', 'kill', 'SIGTERM'], tools: ['python3', 'ps', 'cmp'] },
+  { id: 'network', group: 'diagnose', name: '网络与响应头排查', description: '指定域名到本地地址的映射，区分连接地址与 Host，保存响应头和正文。', concepts: ['curl --resolve', '--noproxy', '响应头', 'Host'], tools: ['python3', 'curl', 'cmp'] },
+  { id: 'ports', group: 'diagnose', name: '端口占用定位', description: '查询真实监听端口，定位所属进程并验证服务响应。', concepts: ['ss -ltnp', 'ps', '端口', 'PID'], tools: ['ss', 'ps', 'python3', 'curl', 'cmp'] },
+  { id: 'disk', group: 'diagnose', name: '磁盘与大文件排查', description: '按文件大小定位大文件，按目录实际占用排序，区分字节大小与磁盘用量。', concepts: ['du', 'find -printf', 'sort -n', 'stat'], tools: ['du', 'find', 'sort', 'python3', 'cmp'] },
+  { id: 'retry', group: 'release', name: '超时与失败重试', description: '给命令设置执行时限，限制重试次数并保留最后的退出码。', concepts: ['timeout', 'for', '退出码', '"$@"'], tools: ['bash', 'timeout', 'python3', 'cmp'] },
+  { id: 'atomic', group: 'release', name: '失败清理与安全写入', description: '使用临时文件和退出清理，处理成功与失败，避免覆盖有效结果。', concepts: ['mktemp', 'trap', 'mv', '退出清理'], tools: ['bash', 'mktemp', 'mv', 'python3', 'cmp'] },
+  { id: 'locking', group: 'release', name: '防止脚本重复运行', description: '用真实文件锁阻止备份任务重叠执行，检查锁冲突与锁释放。', concepts: ['flock -n', '文件描述符', '互斥', '备份'], tools: ['bash', 'flock', 'timeout', 'python3', 'sha256sum', 'cmp'] },
+  { id: 'ssh', group: 'remote', name: 'SSH 密钥与远程命令', description: '修复密钥权限、指定端口登录、执行命令并取得远端退出码。', concepts: ['ssh -p', '-i', 'chmod 600', '退出码'], tools: ['ssh', 'ssh-keygen', 'sshd', 'sftp-server', 'python3', 'cmp'] },
+  { id: 'ssh-config', group: 'remote', name: 'SSH 主机别名', description: '配置 Host、用户、端口和密钥，保留主机指纹校验。', concepts: ['ssh -F', 'ssh -G', 'Host', 'known_hosts'], tools: ['ssh', 'ssh-keygen', 'sshd', 'sftp-server', 'python3', 'cmp'] },
+  { id: 'scp', group: 'remote', name: 'SCP 上传与下载', description: '实际传输部署文件和远端日志，正确处理方向、端口与空格。', concepts: ['scp -P', '-i', '上传', '下载'], tools: ['ssh', 'scp', 'ssh-keygen', 'sshd', 'sftp-server', 'python3', 'cmp'] },
+  { id: 'scp-tree', group: 'remote', name: 'SCP 目录与文件属性', description: '递归传输目录、隐藏文件和带空格文件，保留权限和修改时间。', concepts: ['scp -r', 'scp -p', 'stat', '目录层级'], tools: ['ssh', 'scp', 'ssh-keygen', 'sshd', 'sftp-server', 'python3', 'cmp'] },
+  { id: 'remote-deploy', group: 'remote', name: 'SSH/SCP 远程发布', description: '上传归档、远程解压切换版本、执行健康检查并取回日志。', concepts: ['ssh', 'scp', 'tar', '远程发布'], tools: ['ssh', 'scp', 'ssh-keygen', 'sshd', 'sftp-server', 'python3', 'tar', 'gzip', 'cmp'] },
+  { id: 'ps', group: 'diagnose', name: '进程清单', description: '用 ps aux 和 ps -ef 查看练习进程的用户、状态和父进程。', concepts: ['ps aux', 'ps -ef', 'PPID'], tools: ['ps', 'awk', 'python3'] },
+  { id: 'context', group: 'diagnose', name: '日志上下文筛选', description: '用 grep 保留匹配行的上下文，并分开保存未命中的行。', concepts: ['grep -n', 'grep -E', 'grep -A', 'grep -B', 'grep -v'], tools: ['grep', 'cmp'] },
+  { id: 'df', group: 'diagnose', name: '文件系统与目录占用', description: '用 df 查看文件系统容量，用 du 查看目录占用。', concepts: ['df -P', 'df -h', 'du -sk'], tools: ['df', 'du', 'awk', 'cmp'] },
+  { id: 'pipeline', group: 'files', name: '分流输出与批量搜索', description: '用 tee 和 head 保存清单，用 xargs -0 搜索带空格的文件名。', concepts: ['tee', 'head', 'xargs -0', 'find -print0'], tools: ['find', 'xargs', 'grep', 'tee', 'head', 'cmp'] },
+  { id: 'diff', group: 'files', name: '文件差异比较', description: '用 diff -u 和 diff -q 比较两份配置。', concepts: ['diff -u', 'diff -q', '退出码 1'], tools: ['diff', 'awk', 'cmp'] },
+];
+
+export const topicIds = catalog.map((topic) => topic.id);
